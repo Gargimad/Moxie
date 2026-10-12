@@ -22,7 +22,7 @@ import zlib
 from datetime import date, datetime, time, timedelta
 
 from PyQt6.QtCore import Qt, QPointF, QRectF, QThread, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QPainter, QPalette
+from PyQt6.QtGui import QColor, QPainter, QPalette, QCursor
 from PyQt6.QtWidgets import(
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
     QStackedWidget, QScrollArea, QMessageBox,
@@ -34,6 +34,9 @@ import Events.theme as theme
 from Chatbot.chatBubble import ChatView
 from Events.dateFormat import format_range, format_time_range, format_event_when
 from Volunteer.volunteerNotifications import VolunteerNotifications
+from Events.moxieCharts import (
+    KpiTile, HBarChart, AreaChart, DonutChart, section_label,
+)
 
 
 # ── Constants ─────────────────────────────────────────────────────────────
@@ -448,24 +451,38 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         )
         content = QWidget()
         lay = QVBoxLayout(content)
-        lay.setContentsMargins(40, 20, 40, 20)
-        lay.setSpacing(16)
+        lay.setContentsMargins(40, 28, 40, 28)
+        lay.setSpacing(22)
 
+        # Hero
+        hero = QHBoxLayout()
+        hero.setSpacing(16)
+        hero_col = QVBoxLayout()
+        hero_col.setSpacing(4)
         self.welcome_title = QLabel("Welcome Back!")
-        self.welcome_title.setObjectName(theme.FORM_TITLE)
+        self.welcome_title.setObjectName("MoxieHeroTitle")
+        hero_col.addWidget(self.welcome_title)
         self.user_info_label = QLabel("")
-        self.user_info_label.setObjectName(theme.FORM_SUBTITLE)
-        lay.addWidget(self.welcome_title)
-        lay.addWidget(self.user_info_label)
+        self.user_info_label.setObjectName("MoxieHeroSub")
+        hero_col.addWidget(self.user_info_label)
+        hero.addLayout(hero_col, 1)
 
-        # ── First-time welcome card ───────────────────────────────────────
+        impact_btn = QPushButton("Export impact record")
+        impact_btn.setObjectName("MoxieHeroAction")
+        impact_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        impact_btn.clicked.connect(self._export_impact_record)
+        hero.addWidget(impact_btn)
+        lay.addLayout(hero)
+
+        # First-time card
         self.first_time_card = self._build_first_time_card()
         lay.addWidget(self.first_time_card)
 
-        # Statistic tiles
-        tiles = QHBoxLayout()
-        tiles.setSpacing(10)
-        self.tile_values = {}
+        # KPIs
+        lay.addWidget(section_label("Your impact"))
+        self.tile_widgets = {}
+        kpis = QHBoxLayout()
+        kpis.setSpacing(14)
         for key, caption in [
             ("hours", "Hours logged"),
             ("completed", "Events completed"),
@@ -474,100 +491,114 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             ("orgs", "Organizations"),
             ("rate", "Completion rate"),
         ]:
-            tile = QFrame()
-            tile.setObjectName(theme.EVENT_CARD)
-            tl = QVBoxLayout(tile)
-            tl.setContentsMargins(14, 12, 14, 12)
-            tl.setSpacing(2)
-            val = QLabel("–")
-            val.setStyleSheet("font-size: 26px; font-weight: bold;")
-            cap = QLabel(caption)
-            cap.setObjectName(theme.EVENT_META_VALUE)
-            cap.setWordWrap(True)
-            tl.addWidget(val)
-            tl.addWidget(cap)
-            self.tile_values[key] = val
-            tiles.addWidget(tile, 1)
-        lay.addLayout(tiles)
+            tile = KpiTile(caption, value="–")
+            self.tile_widgets[key] = tile
+            kpis.addWidget(tile, 1)
+        lay.addLayout(kpis)
 
-        impact_btn = QPushButton("Export verified impact record")
-        impact_btn.setObjectName(theme.SECONDARY_BTN)
-        impact_btn.setAccessibleName("Export verified volunteer hours")
-        impact_btn.clicked.connect(self._export_impact_record)
-        lay.addWidget(impact_btn)
+        # Charts row
+        lay.addWidget(section_label("Trends"))
+        chart_row = QHBoxLayout()
+        chart_row.setSpacing(16)
 
-        rec_card, self.dash_recommended = self._dash_card(
-            "Recommended for you", "Browse all", TAB_DASHBOARD
-        )
-        rec_wrap = QGridLayout()
-        rec_wrap.addWidget(rec_card, 0, 0)
-        lay.addLayout(rec_wrap)
+        left = QFrame()
+        left.setObjectName("MoxieChartCard")
+        lv = QVBoxLayout(left)
+        lv.setContentsMargins(20, 16, 20, 16)
+        lv.setSpacing(10)
+        lt = QLabel("Hours by month")
+        lt.setObjectName("MoxieSectionTitle")
+        lv.addWidget(lt)
+        self.dash_area = AreaChart()
+        lv.addWidget(self.dash_area, 1)
+        chart_row.addWidget(left, 2)
 
+        right = QFrame()
+        right.setObjectName("MoxieChartCard")
+        rv = QVBoxLayout(right)
+        rv.setContentsMargins(20, 16, 20, 16)
+        rv.setSpacing(10)
+        rt = QLabel("Hours by organization")
+        rt.setObjectName("MoxieSectionTitle")
+        rv.addWidget(rt)
+        self.dash_donut = DonutChart()
+        rv.addWidget(self.dash_donut, 1)
+        chart_row.addWidget(right, 1)
+        lay.addLayout(chart_row)
+
+        # Upcoming + recommended
+        lay.addWidget(section_label("For you"))
         grid = QGridLayout()
         grid.setSpacing(16)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
         card, self.dash_upcoming = self._dash_card(
-            "Upcoming events", "View calendar", TAB_CALENDAR)
+            "Upcoming events", "View calendar", TAB_CALENDAR
+        )
         grid.addWidget(card, 0, 0)
 
-        card, body = self._dash_card("Hours by month")
-        self.dash_chart = MonthlyBars()
-        body.addWidget(self.dash_chart)
+        card, self.dash_recommended = self._dash_card(
+            "Recommended for you", "Browse all", TAB_DASHBOARD
+        )
         grid.addWidget(card, 0, 1)
-
-        card, self.dash_org_hours = self._dash_card(
-            "Hours by organization", "My events", TAB_EVENTS)
-        grid.addWidget(card, 1, 0)
-
-        card, self.dash_orgs = self._dash_card(
-            "My organizations", "Manage", TAB_ORGS)
-        grid.addWidget(card, 1, 1)
         lay.addLayout(grid)
 
-        card, self.dash_notifs = self._dash_card(
-            "Recent notifications", "View all", TAB_NOTIFS)
-        lay.addWidget(card)
+        # Recent activity + help
+        row = QHBoxLayout()
+        row.setSpacing(16)
 
-        # ── Organizer nudge ───────────────────────────────────────────────
+        card, self.dash_notifs = self._dash_card(
+            "Recent notifications", "View all", TAB_NOTIFS
+        )
+        row.addWidget(card, 2)
+
+        help_card = QFrame()
+        help_card.setObjectName("MoxieChartCard")
+        hl = QVBoxLayout(help_card)
+        hl.setContentsMargins(20, 16, 20, 16)
+        hl.setSpacing(10)
+        ht = QLabel("Need a hand?")
+        ht.setObjectName("MoxieSectionTitle")
+        hl.addWidget(ht)
+        hq = QLabel(
+            "Ask Moxie about check-ins, hours, or finding events."
+        )
+        hq.setObjectName(theme.EVENT_META_VALUE)
+        hq.setWordWrap(True)
+        hl.addWidget(hq)
+        hl.addStretch(1)
+        ask = QPushButton("Ask the assistant")
+        ask.setObjectName("MoxieHeroAction")
+        ask.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        ask.clicked.connect(lambda: self.show_tab(TAB_HELP))
+        hl.addWidget(ask)
+        row.addWidget(help_card, 1)
+        lay.addLayout(row)
+
+        # Organizer nudge
         org_nudge = QFrame()
-        org_nudge.setObjectName(theme.EVENT_CARD)
+        org_nudge.setObjectName("MoxieChartCard")
         ol = QHBoxLayout(org_nudge)
-        ol.setContentsMargins(16, 12, 16, 12)
+        ol.setContentsMargins(20, 14, 20, 14)
         omsg = QLabel(
-            "Part of an organization? You can register one and switch "
-            "to the organizer view."
+            "Part of an organization? Register one and switch to the "
+            "organizer view."
         )
         omsg.setObjectName(theme.EVENT_META_VALUE)
         omsg.setWordWrap(True)
         o_btn = QPushButton("Set up an organization")
-        o_btn.setObjectName(theme.SECONDARY_BTN)
-        o_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        o_btn.setObjectName("MoxieHeroActionSecondary")
+        o_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         o_btn.clicked.connect(self._on_setup_org)
         ol.addWidget(omsg, 1)
         ol.addWidget(o_btn)
         lay.addWidget(org_nudge)
 
-        help_card = QFrame()
-        help_card.setObjectName(theme.EVENT_CARD)
-        hl = QHBoxLayout(help_card)
-        hl.setContentsMargins(16, 12, 16, 12)
-        q = QLabel("Questions about check-ins, hours, or finding events?")
-        q.setObjectName(theme.EVENT_META_VALUE)
-        ask = QPushButton("Ask the assistant")
-        ask.setObjectName(theme.PRIMARY_BTN)
-        ask.setCursor(Qt.CursorShape.PointingHandCursor)
-        ask.clicked.connect(lambda: self.show_tab(TAB_HELP))
-        hl.addWidget(q, 1)
-        hl.addWidget(ask)
-        lay.addWidget(help_card)
-
         lay.addStretch(1)
         scroll.setWidget(content)
         outer.addWidget(scroll)
         return page
-
     def _build_first_time_card(self):
         """
         Shown at the top of the Dashboard when the volunteer has no
@@ -1309,18 +1340,33 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         return w
 
     def _refresh_dashboard(self):
-        for lay in (self.dash_upcoming, self.dash_org_hours,
-                    self.dash_orgs, self.dash_notifs):
-            self._clear_all(lay)
+        for lay in (self.dash_upcoming, self.dash_org_hours
+                    if hasattr(self, "dash_org_hours")
+                    else self.dash_recommended,
+                    self.dash_orgs
+                    if hasattr(self, "dash_orgs")
+                    else self.dash_recommended,
+                    self.dash_notifs):
+            try:
+                self._clear_all(lay)
+            except Exception:
+                pass
+        # Fall back — clear both recommended and notifs
+        try:
+            self._clear_all(self.dash_recommended)
+        except Exception:
+            pass
+
         if not (self.db and self.userID):
             return
 
-        rows = self._db("getSignupsForVolunteer", self.userID, default=[]) or []
-        active = [r for r in rows if (rget(r, "status", "") or "") != "cancelled"]
+        rows = self._db("getSignupsForVolunteer",
+                        self.userID, default=[]) or []
+        active = [r for r in rows
+                  if (rget(r, "status", "") or "") != "cancelled"]
         self._signup_rows = active
         self._notify_upcoming_events(active)
 
-        # Show/hide the first-time welcome card
         has_activity = bool(active)
         self.first_time_card.setVisible(
             not has_activity and not self._welcome_dismissed
@@ -1329,6 +1375,113 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         today = date.today()
         today_s = today.isoformat()
 
+        def day(r):
+            return str(rget(r, "event_date", ""))[:10]
+
+        def end_day(r):
+            e = str(rget(r, "event_end_date", "") or "")[:10]
+            return e or day(r)
+
+        def hrs(r):
+            return float(rget(r, "hours_logged", 0) or 0)
+
+        completed = [r for r in active if rget(r, "check_out_time")]
+        upcoming = sorted(
+            (r for r in active
+             if end_day(r) >= today_s and not rget(r, "check_out_time")),
+            key=lambda r: (day(r), str(rget(r, "start_time", ""))),
+        )
+        past = [r for r in active if end_day(r) and end_day(r) < today_s]
+        past_done = [r for r in past if rget(r, "check_out_time")]
+        total_hours = sum(hrs(r) for r in active)
+
+        org_rows = self._db("getOrganizations", self.userID, default=None)
+        if org_rows is not None:
+            joined = sorted(
+                str(rget(r, "name", "")) for r in org_rows
+                if rget(r, "is_member", 0)
+            )
+        else:
+            joined = sorted({rget(r, "org_name") for r in active
+                             if rget(r, "org_name")})
+
+        self.tile_widgets["hours"].set_value(f"{total_hours:.1f}")
+        self.tile_widgets["completed"].set_value(len(completed))
+        self.tile_widgets["upcoming"].set_value(len(upcoming))
+        self.tile_widgets["signups"].set_value(len(active))
+        self.tile_widgets["orgs"].set_value(len(joined))
+        self.tile_widgets["rate"].set_value(
+            f"{round(100 * len(past_done) / len(past))}%" if past else "—"
+        )
+
+        self._refresh_recommendations(active)
+
+        if not upcoming:
+            self.dash_upcoming.addWidget(self._dash_text(
+                "Nothing coming up — find events in the Volunteer tab."))
+        for r in upcoming[:4]:
+            self.dash_upcoming.addWidget(self._dash_row(
+                org_color(rget(r, "org_name")),
+                str(rget(r, "title", "Untitled event")),
+                f"{date_range(r)}{time_range(r)} · "
+                f"{rget(r, 'org_name', 'Independent')}",
+            ))
+        if len(upcoming) > 4:
+            self.dash_upcoming.addWidget(
+                self._dash_text(f"+ {len(upcoming) - 4} more"))
+
+        # Area chart — hours by month
+        monthly = {}
+        for r in active:
+            monthly[day(r)[:7]] = monthly.get(day(r)[:7], 0.0) + hrs(r)
+        data = []
+        for back in range(5, -1, -1):
+            yy, mm = today.year, today.month - back
+            while mm <= 0:
+                mm += 12
+                yy -= 1
+            data.append((calendar.month_abbr[mm],
+                         monthly.get(f"{yy:04d}-{mm:02d}", 0.0)))
+        self.dash_area.set_data(data)
+
+        # Donut — hours by org
+        by_org = {}
+        for r in active:
+            name = rget(r, "org_name") or "Independent"
+            by_org[name] = by_org.get(name, 0.0) + hrs(r)
+        ranked = sorted(
+            ((n, v) for n, v in by_org.items() if v > 0),
+            key=lambda t: -t[1],
+        )[:5]
+        slices = [(n, round(v, 1)) for n, v in ranked]
+        total_for_donut = sum(v for _, v in slices) or 1
+        self.dash_donut.set_data(
+            slices or [("No hours yet", 1)],
+            center_label=f"{int(round(total_hours))}h",
+        )
+
+        notifs = self._db("getNotifications",
+                          self.userID, default=[]) or []
+        notifs = sorted(
+            notifs,
+            key=lambda r: str(rget(r, "created_at", "")),
+            reverse=True,
+        )[:3]
+        if not notifs:
+            self.dash_notifs.addWidget(
+                self._dash_text("No notifications yet."))
+        for r in notifs:
+            lbl = QLabel(
+                f"<b>{html.escape(str(rget(r, 'created_at', '')))}</b> — "
+                f"{html.escape(str(rget(r, 'message', '')))}"
+            )
+            lbl.setObjectName(theme.EVENT_META_VALUE)
+            lbl.setWordWrap(True)
+            self.dash_notifs.addWidget(lbl)
+
+        for lay in (self.dash_upcoming, self.dash_recommended,
+                    self.dash_notifs):
+            lay.addStretch(1)
         def day(r):
             return str(rget(r, "event_date", ""))[:10]
 

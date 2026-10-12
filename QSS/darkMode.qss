@@ -1521,3 +1521,109 @@ QPushButton#HeroLearnBtn:pressed {
     padding: 10px 2px 2px 2px;
     letter-spacing: 1px;
 }
+/* ==========================================================================
+   MOXIE DASHBOARD — KPI tiles, chart cards, section labels
+   ========================================================================== */
+#MoxieKpiTile {
+    background-color: #2E2238;
+    border: 1px solid #4A3A54;
+    border-top: 3px solid #7B8BE0;
+    border-radius: 0px;
+}
+#MoxieKpiTile:hover {
+    border-top: 3px solid #B39CDB;
+}
+#MoxieKpiValue {
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-size: 34px;
+    font-weight: 900;
+    color: #B39CDB;
+    letter-spacing: -1px;
+}
+#MoxieKpiCaption {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9C8EA9;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+#MoxieKpiDelta {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 10px;
+    color: #9C8EA9;
+    background-color: #251A2E;
+}
+#MoxieKpiDelta[trend="up"]   { color: #1E1626; background-color: #7B8BE0; }
+#MoxieKpiDelta[trend="down"] { color: #F5F0EE; background-color: #E74C3C; }
+#MoxieKpiDelta[trend="flat"] { color: #9C8EA9; background-color: #251A2E; }
+
+#MoxieSectionLabel {
+    font-size: 11px;
+    font-weight: 800;
+    color: #9C8EA9;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    padding: 4px 0 2px 0;
+}
+#MoxieSectionTitle {
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #EDE6F2;
+    padding: 0;
+}
+
+#MoxieHeroTitle {
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-size: 40px;
+    font-weight: 900;
+    color: #B39CDB;
+    letter-spacing: -0.5px;
+}
+#MoxieHeroSub {
+    font-size: 15px;
+    color: #9C8EA9;
+    padding-bottom: 4px;
+}
+
+#MoxieChartCard {
+    background-color: #2E2238;
+    border: 1px solid #4A3A54;
+    border-radius: 0px;
+}
+#MoxieChartCardDarkAccent {
+    background-color: #2E2238;
+    border: 1px solid #4A3A54;
+    border-top: 4px solid #B39CDB;
+}
+#MoxieChartCardBlueAccent {
+    background-color: #2E2238;
+    border: 1px solid #4A3A54;
+    border-top: 4px solid #7B8BE0;
+}
+
+#MoxieHeroAction {
+    background-color: #B39CDB;
+    color: #1E1626;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 12px 22px;
+    border: none;
+    border-radius: 0px;
+}
+#MoxieHeroAction:hover { background-color: #7B8BE0; }
+#MoxieHeroActionSecondary {
+    background-color: transparent;
+    color: #B39CDB;
+    border: 1px solid #4A3A54;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 12px 22px;
+    border-radius: 0px;
+}
+#MoxieHeroActionSecondary:hover {
+    border-color: #7B8BE0;
+    color: #7B8BE0;
+}

@@ -30,6 +30,10 @@ from PyQt6.QtWidgets import (
 from Events.dateFormat import format_date, format_range, format_event_when
 import Events.theme as theme
 from Events.eventCard import clear_thumbnail_cache
+from Events.moxieCharts import (
+    KpiTile, HBarChart, VBarChart, AreaChart, DonutChart,
+    section_label,
+)
 
 
 TAB_OVERVIEW, TAB_LIST, TAB_FORM, TAB_ANNOUNCEMENTS = 0, 1, 2, 3
@@ -157,21 +161,49 @@ class OrgDashboard(QWidget):
 
         content = QWidget()
         lay = QVBoxLayout(content)
-        lay.setContentsMargins(40, 24, 40, 24)
-        lay.setSpacing(18)
+        lay.setContentsMargins(40, 28, 40, 28)
+        lay.setSpacing(22)
 
+        # ── Hero header ─────────────────────────────────────────────
+        hero = QHBoxLayout()
+        hero.setSpacing(16)
+
+        hero_col = QVBoxLayout()
+        hero_col.setSpacing(4)
         self.org_title = QLabel("Organization dashboard")
-        self.org_title.setObjectName(theme.FORM_TITLE)
-        self.org_subtitle = QLabel("")
-        self.org_subtitle.setObjectName(theme.FORM_SUBTITLE)
-        self.org_subtitle.setWordWrap(True)
-        lay.addWidget(self.org_title)
-        lay.addWidget(self.org_subtitle)
+        self.org_title.setObjectName("MoxieHeroTitle")
+        self.org_title.setWordWrap(True)
+        hero_col.addWidget(self.org_title)
 
-        # Stat tiles
-        tiles = QHBoxLayout()
-        tiles.setSpacing(14)
-        self.title_values = {}
+        self.org_subtitle = QLabel("")
+        self.org_subtitle.setObjectName("MoxieHeroSub")
+        self.org_subtitle.setWordWrap(True)
+        hero_col.addWidget(self.org_subtitle)
+        hero.addLayout(hero_col, 1)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(10)
+        new_btn = QPushButton("+ New opportunity")
+        new_btn.setObjectName("MoxieHeroAction")
+        new_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        new_btn.clicked.connect(self._start_new)
+        actions.addWidget(new_btn)
+
+        ann_btn = QPushButton("Post announcement")
+        ann_btn.setObjectName("MoxieHeroActionSecondary")
+        ann_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        ann_btn.clicked.connect(
+            lambda: self.show_tab(TAB_ANNOUNCEMENTS)
+        )
+        actions.addWidget(ann_btn)
+        hero.addLayout(actions)
+        lay.addLayout(hero)
+
+        # ── KPI row ─────────────────────────────────────────────────
+        lay.addWidget(section_label("At a glance"))
+        self.tile_widgets = {}
+        kpis = QHBoxLayout()
+        kpis.setSpacing(14)
         for key, caption in [
             ("open", "Open opportunities"),
             ("total", "Total posted"),
@@ -180,88 +212,119 @@ class OrgDashboard(QWidget):
             ("hours", "Hours logged"),
             ("announce", "Announcements"),
         ]:
-            tile = QFrame()
-            tile.setObjectName("OrgStatTile")
-            tl = QVBoxLayout(tile)
-            tl.setContentsMargins(18, 16, 18, 16)
-            tl.setSpacing(6)
-            val = QLabel("-")
-            val.setObjectName("OrgStatValue")
-            cap = QLabel(caption)
-            cap.setObjectName("OrgStatCaption")
-            cap.setWordWrap(True)
-            tl.addWidget(val)
-            tl.addWidget(cap)
-            self.title_values[key] = val
-            tiles.addWidget(tile, 1)
-        lay.addLayout(tiles)
+            tile = KpiTile(caption, value="-")
+            self.tile_widgets[key] = tile
+            kpis.addWidget(tile, 1)
+        lay.addLayout(kpis)
 
-        # Needs attention
+        # ── Charts row 1: signups trend + status breakdown ──────────
+        lay.addWidget(section_label("Trends"))
+        chart_row = QHBoxLayout()
+        chart_row.setSpacing(16)
+
+        # Left: signups over time
+        left_card = QFrame()
+        left_card.setObjectName("MoxieChartCard")
+        lv = QVBoxLayout(left_card)
+        lv.setContentsMargins(20, 16, 20, 16)
+        lv.setSpacing(10)
+        lt = QLabel("Signups over time")
+        lt.setObjectName("MoxieSectionTitle")
+        lv.addWidget(lt)
+        self._chart_signups = AreaChart()
+        lv.addWidget(self._chart_signups, 1)
+        chart_row.addWidget(left_card, 2)
+
+        # Right: status donut
+        right_card = QFrame()
+        right_card.setObjectName("MoxieChartCard")
+        rv = QVBoxLayout(right_card)
+        rv.setContentsMargins(20, 16, 20, 16)
+        rv.setSpacing(10)
+        rt = QLabel("Status breakdown")
+        rt.setObjectName("MoxieSectionTitle")
+        rv.addWidget(rt)
+        self._chart_status = DonutChart()
+        rv.addWidget(self._chart_status, 1)
+        chart_row.addWidget(right_card, 1)
+        lay.addLayout(chart_row)
+
+        # ── Row 2: attention / next up / activity ───────────────────
+        lay.addWidget(section_label("Today"))
+
+        row3 = QHBoxLayout()
+        row3.setSpacing(16)
+
         card_attn, self.overview_attention = self._dash_card(
             "Needs attention", "Open reports", TAB_REPORTS
         )
-        lay.addWidget(card_attn)
-
-        # Two-column grid
-        grid = QGridLayout()
-        grid.setSpacing(18)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
+        row3.addWidget(card_attn, 1)
 
         card_next, self.overview_next = self._dash_card(
             "Next up", "All opportunities", TAB_LIST
         )
-        grid.addWidget(card_next, 0, 0)
+        row3.addWidget(card_next, 1)
 
         card_act, self.overview_activity = self._dash_card(
             "Recent activity", "All opportunities", TAB_LIST
         )
-        grid.addWidget(card_act, 0, 1)
-        lay.addLayout(grid)
+        row3.addWidget(card_act, 1)
+        lay.addLayout(row3)
 
-        # Data actions
-        data_actions = QHBoxLayout()
+        # ── Row 4: leaderboard + data actions ───────────────────────
+        lay.addWidget(section_label("Top volunteers"))
+
+        lead_row = QHBoxLayout()
+        lead_row.setSpacing(16)
+
+        lead_card = QFrame()
+        lead_card.setObjectName("MoxieChartCard")
+        ll = QVBoxLayout(lead_card)
+        ll.setContentsMargins(20, 16, 20, 16)
+        ll.setSpacing(10)
+        lt2 = QLabel("Hours contributed")
+        lt2.setObjectName("MoxieSectionTitle")
+        ll.addWidget(lt2)
+        self._chart_leaderboard = HBarChart()
+        ll.addWidget(self._chart_leaderboard, 1)
+        lead_row.addWidget(lead_card, 2)
+
+        data_card = QFrame()
+        data_card.setObjectName("MoxieChartCard")
+        dv = QVBoxLayout(data_card)
+        dv.setContentsMargins(20, 16, 20, 16)
+        dv.setSpacing(10)
+        dt = QLabel("Data tools")
+        dt.setObjectName("MoxieSectionTitle")
+        dv.addWidget(dt)
+        dv.addWidget(self._helper_text(
+            "Back up or restore your organization's local Moxie data."
+        ))
+        dv.addStretch(1)
+
         backup_btn = QPushButton("Back up local data")
         backup_btn.setObjectName(theme.SECONDARY_BTN)
         backup_btn.clicked.connect(self._backup_database)
+        dv.addWidget(backup_btn)
+
         restore_btn = QPushButton("Restore from backup")
         restore_btn.setObjectName(theme.SECONDARY_BTN)
         restore_btn.clicked.connect(self._restore_database)
-        data_actions.addWidget(backup_btn)
-        data_actions.addWidget(restore_btn)
-        data_actions.addStretch(1)
-        lay.addLayout(data_actions)
+        dv.addWidget(restore_btn)
 
-        # Quick actions
-        actions_card = QFrame()
-        actions_card.setObjectName(theme.EVENT_CARD)
-        al = QHBoxLayout(actions_card)
-        al.setContentsMargins(18, 14, 18, 14)
-        al.setSpacing(10)
+        lead_row.addWidget(data_card, 1)
+        lay.addLayout(lead_row)
 
-        amsg = QLabel("Ready to post something new?")
-        amsg.setObjectName(theme.EVENT_META_VALUE)
-        al.addWidget(amsg, 1)
-
-        new_btn = QPushButton("+ New opportunity")
-        new_btn.setObjectName(theme.PRIMARY_BTN)
-        new_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        new_btn.clicked.connect(self._start_new)
-        al.addWidget(new_btn)
-
-        ann_btn = QPushButton("Post announcement")
-        ann_btn.setObjectName(theme.SECONDARY_BTN)
-        ann_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        ann_btn.clicked.connect(lambda: self.show_tab(TAB_ANNOUNCEMENTS))
-        al.addWidget(ann_btn)
-
-        lay.addWidget(actions_card)
         lay.addStretch(1)
-
         scroll.setWidget(content)
         outer.addWidget(scroll)
         return page
 
+    def _helper_text(self, text):
+        lbl = QLabel(text)
+        lbl.setObjectName(theme.EVENT_META_VALUE)
+        lbl.setWordWrap(True)
+        return lbl
     def _dash_card(self, title, link_text=None, tab=None):
         card = QFrame()
         card.setObjectName(theme.EVENT_CARD)
@@ -348,12 +411,56 @@ class OrgDashboard(QWidget):
             "getAnnouncementsForOrg", self.org["orgID"], default=[]
         ) or []
 
-        self.title_values["open"].setText(str(open_count))
-        self.title_values["total"].setText(str(total))
-        self.title_values["signups"].setText(str(signups))
-        self.title_values["volunteers"].setText(str(volunteers))
-        self.title_values["hours"].setText(f"{hours:.1f}")
-        self.title_values["announce"].setText(str(len(anns)))
+        self.tile_widgets["open"].set_value(open_count)
+        self.tile_widgets["total"].set_value(total)
+        self.tile_widgets["signups"].set_value(signups)
+        self.tile_widgets["volunteers"].set_value(volunteers)
+        self.tile_widgets["hours"].set_value(f"{hours:.1f}")
+        self.tile_widgets["announce"].set_value(len(anns))
+
+        # Signups over time — last 6 months
+        import calendar as _cal
+        from datetime import date as _date
+        today = _date.today()
+        monthly = {}
+        try:
+            all_signups = []
+            ops = self.db.getOpportunitiesByOrg(self.org["orgID"]) or []
+            for op in ops:
+                for s in (self.db.getSignupsForOpportunity(
+                    op["opportunityID"]) or []):
+                    all_signups.append(s)
+        except Exception:
+            all_signups = []
+        for s in all_signups:
+            raw = str(s["signup_time"] or "")[:7]
+            if len(raw) == 7:
+                monthly[raw] = monthly.get(raw, 0) + 1
+
+        trend = []
+        for back in range(5, -1, -1):
+            yy, mm = today.year, today.month - back
+            while mm <= 0:
+                mm += 12
+                yy -= 1
+            key = f"{yy:04d}-{mm:02d}"
+            trend.append((_cal.month_abbr[mm], monthly.get(key, 0)))
+        self._chart_signups.set_data(trend)
+
+        # Status donut
+        try:
+            rows = self.db.getOpportunitiesByOrg(self.org["orgID"]) or []
+        except Exception:
+            rows = []
+        status_counts = {}
+        for r in rows:
+            key = (r["status"] or "open").capitalize()
+            status_counts[key] = status_counts.get(key, 0) + 1
+        slices = sorted(status_counts.items(), key=lambda t: -t[1])
+        self._chart_status.set_data(
+            slices or [("No events", 1)],
+            center_label=str(sum(v for _, v in slices)) or "0",
+        )
 
         # Needs attention
         report_rows = self._db_call(
@@ -429,6 +536,20 @@ class OrgDashboard(QWidget):
                 str(r["signup_time"] or "")[:19],
             ))
 
+        # Leaderboard
+        lead = self._db_call(
+            "getOrgVolunteerLeaderboard", self.org["orgID"],
+            default=[],
+        ) or []
+        rows = []
+        for r in lead[:6]:
+            name = " ".join(
+                x for x in [r["first_name"], r["last_name"]] if x
+            ) or r["email"]
+            rows.append((name, f"{float(r['hours'] or 0):.1f}h"))
+        if not rows:
+            rows = [("No hours logged yet", "0h")]
+        self._chart_leaderboard.set_data(rows)
     # ── 1. List ────────────────────────────────────────────────────
     def _build_list_page(self):
         page = QWidget()

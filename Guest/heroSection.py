@@ -76,7 +76,7 @@ class HeroSection(QWidget):
     # (x, y, w, h, filename). Later entries render on top of earlier.
     PHOTO_LAYOUT = [
         # back layer: bottom-right, largest
-        (0.28, 0.44, 0.40, 0.44, "postVolunteerOpportunities.jpg"),
+        (0.28, 0.44, 0.40, 0.44, "hero1.jpg"),
         # top-left, separate
         (0.05, 0.16, 0.38, 0.32, "discoverOpportunitiesImg.jpg"),
         # front layer: overlaps the top-left of the bottom image
