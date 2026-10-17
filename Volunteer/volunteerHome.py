@@ -2,15 +2,15 @@
 volunteerHome.py — Volunteer dashboard.
 
 Tabs in a QStackedWidget. Tab buttons live in landing.py's top nav bar.
-    0. Dashboard       summary + statistics + first-time welcome
-    1. Calendar        month view, color-coded by organization
-    2. My Events       signups with check-in / check-out / cancel
-    3. Organizations   join / leave organizations
-    4. Notifications   list of notifications for this user
-    5. Help            AI chatbot (Anthropic API)
-    6. Profile         edit profile, notification setting, password
+  0. Dashboard         KPIs, area chart, donut, recommendations, notifs
+  1. Calendar          color-coded month view
+  2. My Events         signups with check-in / check-out / cancel
+  3. Organizations     join / leave
+  4. Notifications     announcements + activity feed (mixin)
+  5. Help              AI chatbot
+  6. Profile           edit profile, change password
+  7. Bookmarks         saved events (mixin)
 """
-
 import calendar
 import csv
 import html
@@ -21,9 +21,11 @@ import urllib.request
 import zlib
 from datetime import date, datetime, time, timedelta
 
-from PyQt6.QtCore import Qt, QPointF, QRectF, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import (
+    Qt, QPointF, QRectF, QThread, QTimer, pyqtSignal,
+)
 from PyQt6.QtGui import QColor, QPainter, QPalette, QCursor
-from PyQt6.QtWidgets import(
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
     QStackedWidget, QScrollArea, QMessageBox,
     QCalendarWidget, QLineEdit, QCheckBox, QFormLayout,
@@ -32,14 +34,19 @@ from PyQt6.QtWidgets import(
 
 import Events.theme as theme
 from Chatbot.chatBubble import ChatView
-from Events.dateFormat import format_range, format_time_range, format_event_when
-from Volunteer.volunteerNotifications import VolunteerNotifications
+from Events.dateFormat import (
+    format_range, format_time_range, format_event_when,
+)
+from Events.eventCard import EventCard
+from Events.eventDetailsDialog import EventDetailsDialog
 from Events.moxieCharts import (
     KpiTile, HBarChart, AreaChart, DonutChart, section_label,
 )
+from Volunteer.volunteerNotifications import VolunteerNotifications
+from Volunteer.volunteerBookmarks import VolunteerBookmarks
 
 
-# ── Constants ─────────────────────────────────────────────────────────────
+# ── Constants ─────────────────────────────────────────────────────────
 ISO = "yyyy-MM-dd"
 
 ORG_PALETTE = [
@@ -52,12 +59,12 @@ CLAUDE_MODEL = "openai/gpt-oss-20b"
 CLAUDE_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 TAB_DASHBOARD, TAB_CALENDAR, TAB_EVENTS, TAB_ORGS = 0, 1, 2, 3
-TAB_NOTIFS, TAB_HELP, TAB_PROFILE = 4, 5, 6
+TAB_NOTIFS, TAB_HELP, TAB_PROFILE, TAB_BOOKMARKS = 4, 5, 6, 7
 
 MAX_RANGE_DAYS = 90
 
 
-# ── Small helpers ─────────────────────────────────────────────────────────
+# ── Small helpers ─────────────────────────────────────────────────────
 def rget(row, key, default=None):
     try:
         val = row[key]
@@ -69,21 +76,21 @@ def rget(row, key, default=None):
 def org_color(org_name):
     if not org_name:
         return INDEPENDENT_COLOR
-    return ORG_PALETTE[zlib.crc32(org_name.encode("utf-8")) % len(ORG_PALETTE)]
+    return ORG_PALETTE[
+        zlib.crc32(org_name.encode("utf-8")) % len(ORG_PALETTE)
+    ]
 
 
 def time_range(row):
     t = format_time_range(
-        rget(row, "start_time", ""),
-        rget(row, "end_time", ""),
+        rget(row, "start_time", ""), rget(row, "end_time", ""),
     )
     return f" · {t}" if t else ""
 
 
 def date_range(row):
     return format_range(
-        rget(row, "event_date", ""),
-        rget(row, "event_end_date", ""),
+        rget(row, "event_date", ""), rget(row, "event_end_date", ""),
     )
 
 
@@ -102,14 +109,13 @@ def expand_to_days(start_str, end_str):
             end = start
     if (end - start).days > MAX_RANGE_DAYS:
         end = start
-
     cur = start
     while cur <= end:
         yield cur.isoformat()
         cur += timedelta(days=1)
 
 
-# ── Calendar widget with colored dots ─────────────────────────────────────
+# ── Calendar widget ───────────────────────────────────────────────────
 class EventCalendar(QCalendarWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -131,7 +137,6 @@ class EventCalendar(QCalendarWidget):
         events = self.events_by_date.get(d.toString(ISO))
         if not events:
             return
-
         colors = []
         for e in events:
             c = org_color(rget(e, "org_name"))
@@ -154,49 +159,7 @@ class EventCalendar(QCalendarWidget):
         painter.restore()
 
 
-# ── Small bar chart ───────────────────────────────────────────────────────
-class MonthlyBars(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.data = []
-        self.setMinimumHeight(160)
-
-    def set_data(self, data):
-        self.data = data
-        self.update()
-
-    def paintEvent(self, event):
-        if not self.data:
-            return
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        text = self.palette().color(QPalette.ColorRole.WindowText)
-
-        w, h = self.width(), self.height()
-        top, bottom = 18, 22
-        n = len(self.data)
-        slot = w / n
-        bar_w = min(42.0, slot * 0.55)
-        max_v = max(v for _, v in self.data) or 1.0
-
-        for i, (label, v) in enumerate(self.data):
-            bar_h = (h - top - bottom) * (v / max_v)
-            x = slot * i + (slot - bar_w) / 2
-            y = h - bottom - bar_h
-            if v > 0:
-                p.setPen(Qt.PenStyle.NoPen)
-                p.setBrush(QColor("#7B8BE0"))
-                p.drawRoundedRect(QRectF(x, y, bar_w, bar_h), 4, 4)
-                p.setPen(text)
-                p.drawText(QRectF(slot * i, y - 16, slot, 14),
-                           Qt.AlignmentFlag.AlignCenter, f"{v:.1f}")
-            p.setPen(text)
-            p.drawText(QRectF(slot * i, h - bottom + 3, slot, bottom - 3),
-                       Qt.AlignmentFlag.AlignCenter, label)
-        p.end()
-
-
-# ── Background worker for the chatbot ─────────────────────────────────────
+# ── Background worker for the chatbot ─────────────────────────────────
 class ChatWorker(QThread):
     reply = pyqtSignal(str)
     failed = pyqtSignal(str)
@@ -213,14 +176,13 @@ class ChatWorker(QThread):
         key = os.environ.get("GROQ_API_KEY")
         if not key:
             self.failed.emit(
-                "The assistant isn't configured yet — add GROQ_API_KEY to your .env file."
+                "The assistant isn't configured yet — add "
+                "GROQ_API_KEY to your .env file."
             )
             return
 
-        # Groq uses OpenAI's message format. Anthropic's "system" field
-        # becomes the first message with role="system".
-        messages = [{"role": "system", "content": self.system}] + self.messages
-
+        messages = [{"role": "system", "content": self.system}] + \
+            self.messages
         body = json.dumps({
             "model": CLAUDE_MODEL,
             "max_tokens": 800,
@@ -236,18 +198,16 @@ class ChatWorker(QThread):
                 "User-Agent": "Moxie/1.0",
             },
         )
-
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 data = json.load(resp)
-            # OpenAI-style response: choices[0].message.content
-            text = (
-                data.get("choices", [{}])[0]
-                .get("message", {})
-                .get("content", "")
-                .strip()
-            )
-            self.reply.emit(text or "(No response)")
+                text = (
+                    data.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                    .strip()
+                )
+                self.reply.emit(text or "(No response)")
         except urllib.error.HTTPError as e:
             detail = ""
             try:
@@ -258,18 +218,15 @@ class ChatWorker(QThread):
         except Exception as e:
             self.failed.emit(f"Couldn't reach the assistant: {e}")
 
-# ── Main widget ───────────────────────────────────────────────────────────
-class VolunteerHome(VolunteerNotifications, QWidget):
+
+# ── Main widget ───────────────────────────────────────────────────────
+class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
     TAB_LABELS = [
         "Dashboard", "Calendar", "My Events", "Organizations",
-        "Notifications", "Help", "Profile",
+        "Notifications", "Help", "Profile", "Bookmarks",
     ]
 
     tabChanged = pyqtSignal(int)
-
-    # Emitted when the volunteer clicks "Browse opportunities" or
-    # "Complete your profile" on the first-time welcome card.
-    # landing.py connects these to navigation.
     browseOpportunitiesRequested = pyqtSignal()
     goToProfileRequested = pyqtSignal()
 
@@ -284,28 +241,33 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         self._chat_worker = None
         self._signup_rows = []
         self._welcome_dismissed = False
+        self._bookmarked_ids = set()
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
         self.stack = QStackedWidget()
-        self.stack.addWidget(self._build_overview_page())
-        self.stack.addWidget(self._build_calendar_page())
-        self.stack.addWidget(self._build_events_page())
-        self.stack.addWidget(self._build_orgs_page())
-        self.stack.addWidget(self._build_notifications_page())
-        self.stack.addWidget(self._build_help_page())
-        self.stack.addWidget(self._build_profile_page())
+        self.stack.addWidget(self._build_overview_page())       # 0
+        self.stack.addWidget(self._build_calendar_page())       # 1
+        self.stack.addWidget(self._build_events_page())         # 2
+        self.stack.addWidget(self._build_orgs_page())           # 3
+        self.stack.addWidget(self._build_notifications_page())  # 4
+        self.stack.addWidget(self._build_help_page())           # 5
+        self.stack.addWidget(self._build_profile_page())        # 6
+        self.stack.addWidget(self._build_bookmarks_page())      # 7
         outer.addWidget(self.stack, 1)
 
         outer.addWidget(self._build_slogan_bar(), 0)
+
         self._reminder_timer = QTimer(self)
         self._reminder_timer.setInterval(60_000)
-        self._reminder_timer.timeout.connect(self._check_upcoming_reminders)
+        self._reminder_timer.timeout.connect(
+            self._check_upcoming_reminders
+        )
         self._reminder_timer.start()
 
-    # ── DB access ─────────────────────────────────────────────────────────
+    # ── DB access ─────────────────────────────────────────────────────
     def _db(self, method, *args, default=None):
         fn = getattr(self.db, method, None) if self.db else None
         if fn is None:
@@ -322,7 +284,7 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         if fn is None:
             QMessageBox.information(
                 self, "Not available",
-                f"This feature needs Database.{method}() to be implemented."
+                f"This feature needs Database.{method}() to be implemented.",
             )
             return False
         try:
@@ -333,7 +295,6 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         return bool(ok)
 
     def _notify(self, message, type_=None, opportunity_id=None):
-        """Best-effort notification. Never raises."""
         if not (self.db and self.userID):
             return
         try:
@@ -348,13 +309,15 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         bar.setObjectName(theme.BOTTOM_BAR)
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(20, 20, 20, 20)
-        slogan = QLabel("Ready to make a difference in your community today?")
+        slogan = QLabel(
+            "Ready to make a difference in your community today?"
+        )
         slogan.setObjectName(theme.SLOGAN_TEXT)
         slogan.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(slogan)
         return bar
 
-    # ── Reusable page scaffolding ─────────────────────────────────────────
+    # ── Reusable page scaffolding ─────────────────────────────────────
     def _scroll_page(self, heading_text, spacing=10):
         page = QWidget()
         lay = QVBoxLayout(page)
@@ -396,6 +359,7 @@ class VolunteerHome(VolunteerNotifications, QWidget):
     def _empty(self, layout, text):
         lbl = QLabel(text)
         lbl.setObjectName(theme.VOLUNTEER_EMPTY)
+        lbl.setWordWrap(True)
         layout.insertWidget(0, lbl)
 
     @staticmethod
@@ -407,7 +371,7 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         )
         return s
 
-    # ── 0. Dashboard ──────────────────────────────────────────────────────
+    # ── 0. Dashboard ──────────────────────────────────────────────────
     def _dash_card(self, title, link_text=None, tab=None):
         card = QFrame()
         card.setObjectName(theme.EVENT_CARD)
@@ -432,7 +396,7 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         v.addLayout(head)
 
         body = QVBoxLayout()
-        body.setSpacing(6)
+        body.setSpacing(8)
         v.addLayout(body)
         return card, body
 
@@ -496,7 +460,7 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             kpis.addWidget(tile, 1)
         lay.addLayout(kpis)
 
-        # Charts row
+        # Charts
         lay.addWidget(section_label("Trends"))
         chart_row = QHBoxLayout()
         chart_row.setSpacing(16)
@@ -544,7 +508,7 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         grid.addWidget(card, 0, 1)
         lay.addLayout(grid)
 
-        # Recent activity + help
+        # Notifications + Help
         row = QHBoxLayout()
         row.setSpacing(16)
 
@@ -576,7 +540,7 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         row.addWidget(help_card, 1)
         lay.addLayout(row)
 
-        # Organizer nudge
+        # Org nudge
         org_nudge = QFrame()
         org_nudge.setObjectName("MoxieChartCard")
         ol = QHBoxLayout(org_nudge)
@@ -599,11 +563,8 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         scroll.setWidget(content)
         outer.addWidget(scroll)
         return page
+
     def _build_first_time_card(self):
-        """
-        Shown at the top of the Dashboard when the volunteer has no
-        signups yet. Hidden otherwise.
-        """
         card = QFrame()
         card.setObjectName(theme.EVENT_CARD)
         card.setStyleSheet(
@@ -652,7 +613,7 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         v.addWidget(body)
         v.addLayout(row)
 
-        card.setVisible(False)   # toggled by _refresh_dashboard
+        card.setVisible(False)
         return card
 
     def _dismiss_first_time(self):
@@ -663,11 +624,11 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         QMessageBox.information(
             self, "Organization setup",
             "To register an organization, log out and choose "
-            "'Register ▾ → Register an Organization' from the home page. "
-            "You'll use a separate email for the organization account."
+            "'Register → Register an Organization' from the home page. "
+            "You'll use a separate email for the organization account.",
         )
 
-    # ── 1. Calendar ───────────────────────────────────────────────────────
+    # ── 1. Calendar ───────────────────────────────────────────────────
     def _build_calendar_page(self):
         page = QWidget()
         lay = QVBoxLayout(page)
@@ -713,9 +674,13 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         return page
 
     def _refresh_calendar(self):
-        rows = self._db("getSignupsForVolunteer", self.userID, default=[]) \
-            if self.userID else []
-        rows = [r for r in rows if (rget(r, "status", "") or "") != "cancelled"]
+        rows = self._db(
+            "getSignupsForVolunteer", self.userID, default=[]
+        ) if self.userID else []
+        rows = [
+            r for r in rows
+            if (rget(r, "status", "") or "") != "cancelled"
+        ]
         self._signup_rows = rows
 
         by_date = {}
@@ -749,7 +714,9 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         d = self.calendar.selectedDate()
         self.day_heading.setText(d.toString("dddd, MMMM d"))
         self._clear(self.day_layout)
-        events = self.calendar.events_by_date.get(d.toString(ISO), [])
+        events = self.calendar.events_by_date.get(
+            d.toString(ISO), []
+        )
         if not events:
             self._empty(self.day_layout, "No events on this day.")
             return
@@ -761,7 +728,8 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         card = QFrame()
         card.setObjectName(theme.EVENT_CARD)
         card.setStyleSheet(
-            f"QFrame#{theme.EVENT_CARD} {{ border-left: 6px solid {color}; }}"
+            f"QFrame#{theme.EVENT_CARD} "
+            f"{{ border-left: 6px solid {color}; }}"
         )
         lay = QVBoxLayout(card)
         lay.setContentsMargins(16, 12, 16, 12)
@@ -770,7 +738,8 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         title = QLabel(rget(r, "title", "Untitled event"))
         title.setObjectName(theme.EVENT_TITLE_LIST)
         meta = QLabel(
-            f"{date_range(r)} · {rget(r, 'org_name', 'Independent')}"
+            f"{date_range(r)} · "
+            f"{rget(r, 'org_name', 'Independent')}"
             f"{time_range(r)}"
         )
         meta.setObjectName(theme.EVENT_META_VALUE)
@@ -779,20 +748,26 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         lay.addWidget(meta)
         return card
 
-    # ── 2. My Events ──────────────────────────────────────────────────────
+    # ── 2. My Events ──────────────────────────────────────────────────
     def _build_events_page(self):
-        page, self.events_layout, _ = self._scroll_page("My Registered Events")
+        page, self.events_layout, _ = self._scroll_page(
+            "My Registered Events"
+        )
         return page
 
     def _refresh_events(self):
         if not (self.db and self.userID):
             return
         self._clear(self.events_layout)
-        rows = self._db("getSignupsForVolunteer", self.userID, default=[])
+        rows = self._db(
+            "getSignupsForVolunteer", self.userID, default=[]
+        )
 
         if not rows:
-            self._empty(self.events_layout,
-                        "You haven't registered for anything yet.")
+            self._empty(
+                self.events_layout,
+                "You haven't registered for anything yet.",
+            )
             return
         for r in rows:
             self._add(self.events_layout, self._make_signup_card(r))
@@ -802,7 +777,8 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         card = QFrame()
         card.setObjectName(theme.EVENT_CARD)
         card.setStyleSheet(
-            f"QFrame#{theme.EVENT_CARD} {{ border-left: 6px solid {color}; }}"
+            f"QFrame#{theme.EVENT_CARD} "
+            f"{{ border-left: 6px solid {color}; }}"
         )
         lay = QVBoxLayout(card)
         lay.setContentsMargins(20, 16, 20, 16)
@@ -839,7 +815,9 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             )
             row.addWidget(co)
         else:
-            done = QLabel(f"✓ Logged {r['hours_logged'] or 0:.2f} hours")
+            done = QLabel(
+                f"✓ Logged {r['hours_logged'] or 0:.2f} hours"
+            )
             done.setObjectName(theme.EVENT_META_VALUE)
             row.addWidget(done)
 
@@ -890,13 +868,9 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         self._refresh_dashboard()
 
     def show_my_events(self):
-        """
-        Public entry point used by landing.py after a successful RSVP
-        from the listing page. Jumps to the My Events tab.
-        """
         self.show_tab(TAB_EVENTS)
 
-    # ── 3. Organizations ──────────────────────────────────────────────────
+    # ── 3. Organizations ──────────────────────────────────────────────
     def _build_orgs_page(self):
         page, self.orgs_layout, top = self._scroll_page("Organizations")
         self.orgs_search = QLineEdit()
@@ -921,7 +895,8 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         rows = [
             r for r in self._org_rows
             if not q or q in (
-                f"{rget(r, 'name', '')} {rget(r, 'description', '')}".lower()
+                f"{rget(r, 'name', '')} "
+                f"{rget(r, 'description', '')}".lower()
             )
         ]
         if not rows:
@@ -931,8 +906,10 @@ class VolunteerHome(VolunteerNotifications, QWidget):
                 else "No organizations available yet."
             )
             return
-        rows.sort(key=lambda r: (not rget(r, "is_member", 0),
-                                 str(rget(r, "name", "")).lower()))
+        rows.sort(key=lambda r: (
+            not rget(r, "is_member", 0),
+            str(rget(r, "name", "")).lower(),
+        ))
         for r in rows:
             self._add(self.orgs_layout, self._make_org_card(r))
 
@@ -972,7 +949,9 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             leave = QPushButton("Leave")
             leave.setObjectName(theme.SECONDARY_BTN)
             leave.setCursor(Qt.CursorShape.PointingHandCursor)
-            leave.clicked.connect(lambda _, o=oid, n=name: self._do_leave(o, n))
+            leave.clicked.connect(
+                lambda _, o=oid, n=name: self._do_leave(o, n)
+            )
             row.addWidget(leave)
         else:
             row.addStretch(1)
@@ -998,10 +977,7 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             self._notify("You left an organization.", "leave_org")
             self._refresh_orgs()
 
-    # ── 4. Notifications ──────────────────────────────────────────────────
-    
-
-    # ── 5. Help ───────────────────────────────────────────────────────────
+    # ── 5. Help ───────────────────────────────────────────────────────
     def _build_help_page(self):
         page = QWidget()
         lay = QVBoxLayout(page)
@@ -1018,8 +994,8 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         sub.setWordWrap(True)
 
         self.chat = ChatView(
-            greeting="Hi! I'm Moxie — your volunteer sidekick. 🌱 "
-                    "Ask me anything about events, hours, or this app!"
+            greeting="Hi! I'm Moxie — your volunteer sidekick. "
+                     "Ask me anything about events, hours, or this app!"
         )
         self.chat.set_system_prompt_provider(self._chat_system_prompt)
         self.chat.set_send_handler(self._dispatch_chat)
@@ -1028,13 +1004,17 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         lay.addWidget(sub)
         lay.addWidget(self.chat, 1)
         return page
+
     def _chat_system_prompt(self):
         name = (self.user_data or {}).get("first_name") or "the volunteer"
 
-        # Always pull fresh signups — do NOT rely on self._signup_rows,
-        # which is only populated after visiting Calendar/Dashboard.
-        rows = self._db("getSignupsForVolunteer", self.userID, default=[]) or []
-        rows = [r for r in rows if (rget(r, "status", "") or "") != "cancelled"]
+        rows = self._db(
+            "getSignupsForVolunteer", self.userID, default=[]
+        ) or []
+        rows = [
+            r for r in rows
+            if (rget(r, "status", "") or "") != "cancelled"
+        ]
 
         today = date.today()
         upcoming = []
@@ -1043,13 +1023,12 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             if not raw:
                 continue
             try:
-                # Accept ISO dates; ignore anything unparseable for the "upcoming" list
                 d = date.fromisoformat(raw[:10])
             except ValueError:
-                # Unparseable (imported free-text date) — include it, but flag it.
                 upcoming.append(
                     f"- {rget(r, 'title', 'Untitled')} on {raw}"
-                    f" ({rget(r, 'org_name', 'Independent')}) [date format unverified]"
+                    f" ({rget(r, 'org_name', 'Independent')}) "
+                    f"[date format unverified]"
                 )
                 continue
 
@@ -1060,36 +1039,36 @@ class VolunteerHome(VolunteerNotifications, QWidget):
                 end = d
 
             if end >= today:
-                    upcoming.append(
-                        f"- {rget(r, 'title', 'Untitled')} — "
-                        f"{format_event_when(r)} "
-                        f"({rget(r, 'org_name', 'Independent')})"
-                    )
+                upcoming.append(
+                    f"- {rget(r, 'title', 'Untitled')} — "
+                    f"{format_event_when(r)} "
+                    f"({rget(r, 'org_name', 'Independent')})"
+                )
 
-        upcoming_txt = "\n".join(upcoming[:15]) or "NONE (confirmed) — this user has no upcoming events."
+        upcoming_txt = "\n".join(upcoming[:15]) or (
+            "NONE (confirmed) — this user has no upcoming events."
+        )
 
         return (
-            f"You are Moxie, a super friendly in-app help buddy for a volunteer "
-            f"management app. You're chatting with {name}. "
+            f"You are Moxie, a super friendly in-app help buddy for a "
+            f"volunteer management app. You're chatting with {name}. "
             "Your vibe: warm, upbeat, encouraging, a tiny bit playful — "
             "like a helpful friend, not a corporate bot. "
             "\n\nTone rules:\n"
             "- Use contractions (you're, that's, let's).\n"
-            "- Sprinkle in light emoji (✨ 🎉 🙌 💛 🌱) — 0-2 per reply.\n"
+            "- Sprinkle in light emoji — 0-2 per reply.\n"
             "- Keep replies short: 1-3 sentences unless asked for detail.\n"
             "- Never say 'As an AI' or 'I am a language model'.\n"
             "\nIMPORTANT — upcoming events:\n"
-            "The list below is the user's ACTUAL, current signup data pulled "
-            "from the database right now. Do not invent events, do not guess, "
-            "do not say they have none if the list is non-empty. If they ask "
-            "about an event not in the list, tell them it isn't showing in "
-            "their current signups and suggest checking My Events.\n"
+            "The list below is the user's ACTUAL, current signup data "
+            "pulled from the database right now. Do not invent events. "
+            "If they ask about an event not in the list, tell them it "
+            "isn't showing in their current signups and suggest checking "
+            "My Events.\n"
             "Their upcoming events:\n" + upcoming_txt
         )
 
     def _dispatch_chat(self, text):
-        # ChatView already appended the user bubble, set busy, and showed
-        # the typing dots. We only need to kick off the request.
         self._chat_worker = ChatWorker(
             list(self.chat.history),
             self.chat.get_system_prompt(),
@@ -1100,12 +1079,11 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         self._chat_worker.start()
 
     def _on_chat_failed(self, msg):
-        # Pop the last user turn so a retry doesn't double up.
         if self.chat.history and self.chat.history[-1]["role"] == "user":
             self.chat.history.pop()
         self.chat.on_error(msg)
 
-    # ── 6. Profile ────────────────────────────────────────────────────────
+    # ── 6. Profile ────────────────────────────────────────────────────
     def _build_profile_page(self):
         page = QWidget()
         outer = QVBoxLayout(page)
@@ -1150,7 +1128,9 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         form.addRow("Skills", self.pf_skills)
         dl.addLayout(form)
 
-        self.pf_notify = QCheckBox("Email me about event updates and reminders")
+        self.pf_notify = QCheckBox(
+            "Email me about event updates and reminders"
+        )
         dl.addWidget(self.pf_notify)
 
         save_row = QHBoxLayout()
@@ -1221,7 +1201,9 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             QMessageBox.warning(self, "Profile", "First name is required.")
             return
         if "@" not in email or "." not in email.split("@")[-1]:
-            QMessageBox.warning(self, "Profile", "Enter a valid email address.")
+            QMessageBox.warning(
+                self, "Profile", "Enter a valid email address."
+            )
             return
 
         fields = {
@@ -1243,13 +1225,20 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             self.pf_status.setText("Couldn't save changes.")
 
     def _change_password(self):
-        old, new, conf = (self.pw_old.text(), self.pw_new.text(),
-                          self.pw_confirm.text())
+        old, new, conf = (
+            self.pw_old.text(),
+            self.pw_new.text(),
+            self.pw_confirm.text(),
+        )
         if not (old and new and conf):
-            QMessageBox.warning(self, "Password", "Fill in all three fields.")
+            QMessageBox.warning(
+                self, "Password", "Fill in all three fields."
+            )
             return
         if new != conf:
-            QMessageBox.warning(self, "Password", "New passwords don't match.")
+            QMessageBox.warning(
+                self, "Password", "New passwords don't match."
+            )
             return
         if len(new) < 8:
             QMessageBox.warning(
@@ -1259,14 +1248,16 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         if self._db_action("changePassword", self.userID, old, new):
             for f in (self.pw_old, self.pw_new, self.pw_confirm):
                 f.clear()
-            QMessageBox.information(self, "Password", "Password updated.")
+            QMessageBox.information(
+                self, "Password", "Password updated."
+            )
         else:
             QMessageBox.warning(
                 self, "Password",
-                "Couldn't update password. Check your current password."
+                "Couldn't update password. Check your current password.",
             )
 
-    # ── Tab switching ─────────────────────────────────────────────────────
+    # ── Tab switching ─────────────────────────────────────────────────
     def current_tab(self):
         return self.stack.currentIndex()
 
@@ -1280,12 +1271,13 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             TAB_ORGS: self._refresh_orgs,
             TAB_NOTIFS: self._refresh_notifications,
             TAB_PROFILE: self._refresh_profile,
+            TAB_BOOKMARKS: self._refresh_bookmarks,
         }.get(idx)
         if refresh:
             refresh()
         self.tabChanged.emit(idx)
 
-    # ── User data ─────────────────────────────────────────────────────────
+    # ── User data ─────────────────────────────────────────────────────
     def set_user_data(self, user_data):
         self.user_data = user_data
         if not user_data:
@@ -1302,10 +1294,11 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         self.chat.reset()
         self._signup_rows = []
         self._welcome_dismissed = False
+        self._bookmarked_ids = set()
 
         self.show_tab(TAB_DASHBOARD)
 
-    # ── Dashboard data ────────────────────────────────────────────────────
+    # ── Dashboard data ────────────────────────────────────────────────
     def _clear_all(self, layout):
         while layout.count():
             item = layout.takeAt(0)
@@ -1340,30 +1333,24 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         return w
 
     def _refresh_dashboard(self):
-        for lay in (self.dash_upcoming, self.dash_org_hours
-                    if hasattr(self, "dash_org_hours")
-                    else self.dash_recommended,
-                    self.dash_orgs
-                    if hasattr(self, "dash_orgs")
-                    else self.dash_recommended,
+        # Clear all dynamic sections.
+        for lay in (self.dash_upcoming, self.dash_recommended,
                     self.dash_notifs):
             try:
                 self._clear_all(lay)
             except Exception:
                 pass
-        # Fall back — clear both recommended and notifs
-        try:
-            self._clear_all(self.dash_recommended)
-        except Exception:
-            pass
 
         if not (self.db and self.userID):
             return
 
-        rows = self._db("getSignupsForVolunteer",
-                        self.userID, default=[]) or []
-        active = [r for r in rows
-                  if (rget(r, "status", "") or "") != "cancelled"]
+        rows = self._db(
+            "getSignupsForVolunteer", self.userID, default=[]
+        ) or []
+        active = [
+            r for r in rows
+            if (rget(r, "status", "") or "") != "cancelled"
+        ]
         self._signup_rows = active
         self._notify_upcoming_events(active)
 
@@ -1388,23 +1375,29 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         completed = [r for r in active if rget(r, "check_out_time")]
         upcoming = sorted(
             (r for r in active
-             if end_day(r) >= today_s and not rget(r, "check_out_time")),
+             if end_day(r) >= today_s
+             and not rget(r, "check_out_time")),
             key=lambda r: (day(r), str(rget(r, "start_time", ""))),
         )
         past = [r for r in active if end_day(r) and end_day(r) < today_s]
         past_done = [r for r in past if rget(r, "check_out_time")]
         total_hours = sum(hrs(r) for r in active)
 
-        org_rows = self._db("getOrganizations", self.userID, default=None)
+        org_rows = self._db(
+            "getOrganizations", self.userID, default=None
+        )
         if org_rows is not None:
             joined = sorted(
                 str(rget(r, "name", "")) for r in org_rows
                 if rget(r, "is_member", 0)
             )
         else:
-            joined = sorted({rget(r, "org_name") for r in active
-                             if rget(r, "org_name")})
+            joined = sorted({
+                rget(r, "org_name") for r in active
+                if rget(r, "org_name")
+            })
 
+        # KPI tiles
         self.tile_widgets["hours"].set_value(f"{total_hours:.1f}")
         self.tile_widgets["completed"].set_value(len(completed))
         self.tile_widgets["upcoming"].set_value(len(upcoming))
@@ -1414,11 +1407,12 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             f"{round(100 * len(past_done) / len(past))}%" if past else "—"
         )
 
-        self._refresh_recommendations(active)
-
+        # Upcoming events (list of labels — this stays as quick-glance,
+        # not full cards, because the layout is a narrow grid cell).
         if not upcoming:
             self.dash_upcoming.addWidget(self._dash_text(
-                "Nothing coming up — find events in the Volunteer tab."))
+                "Nothing coming up — find events in the Volunteer tab."
+            ))
         for r in upcoming[:4]:
             self.dash_upcoming.addWidget(self._dash_row(
                 org_color(rget(r, "org_name")),
@@ -1428,20 +1422,25 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             ))
         if len(upcoming) > 4:
             self.dash_upcoming.addWidget(
-                self._dash_text(f"+ {len(upcoming) - 4} more"))
+                self._dash_text(f"+ {len(upcoming) - 4} more")
+            )
 
         # Area chart — hours by month
         monthly = {}
         for r in active:
-            monthly[day(r)[:7]] = monthly.get(day(r)[:7], 0.0) + hrs(r)
+            monthly[day(r)[:7]] = (
+                monthly.get(day(r)[:7], 0.0) + hrs(r)
+            )
         data = []
         for back in range(5, -1, -1):
             yy, mm = today.year, today.month - back
             while mm <= 0:
                 mm += 12
                 yy -= 1
-            data.append((calendar.month_abbr[mm],
-                         monthly.get(f"{yy:04d}-{mm:02d}", 0.0)))
+            data.append((
+                calendar.month_abbr[mm],
+                monthly.get(f"{yy:04d}-{mm:02d}", 0.0),
+            ))
         self.dash_area.set_data(data)
 
         # Donut — hours by org
@@ -1454,14 +1453,18 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             key=lambda t: -t[1],
         )[:5]
         slices = [(n, round(v, 1)) for n, v in ranked]
-        total_for_donut = sum(v for _, v in slices) or 1
         self.dash_donut.set_data(
             slices or [("No hours yet", 1)],
             center_label=f"{int(round(total_hours))}h",
         )
 
-        notifs = self._db("getNotifications",
-                          self.userID, default=[]) or []
+        # Recommendations
+        self._refresh_recommendations(active)
+
+        # Recent notifications
+        notifs = self._db(
+            "getNotifications", self.userID, default=[]
+        ) or []
         notifs = sorted(
             notifs,
             key=lambda r: str(rget(r, "created_at", "")),
@@ -1469,7 +1472,8 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         )[:3]
         if not notifs:
             self.dash_notifs.addWidget(
-                self._dash_text("No notifications yet."))
+                self._dash_text("No notifications yet.")
+            )
         for r in notifs:
             lbl = QLabel(
                 f"<b>{html.escape(str(rget(r, 'created_at', '')))}</b> — "
@@ -1482,143 +1486,15 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         for lay in (self.dash_upcoming, self.dash_recommended,
                     self.dash_notifs):
             lay.addStretch(1)
-        def day(r):
-            return str(rget(r, "event_date", ""))[:10]
 
-        def end_day(r):
-            e = str(rget(r, "event_end_date", "") or "")[:10]
-            return e or day(r)
-
-        def hrs(r):
-            return float(rget(r, "hours_logged", 0) or 0)
-
-        completed = [r for r in active if rget(r, "check_out_time")]
-        upcoming = sorted(
-            (r for r in active
-             if end_day(r) >= today_s and not rget(r, "check_out_time")),
-            key=lambda r: (day(r), str(rget(r, "start_time", ""))),
-        )
-        past = [r for r in active if end_day(r) and end_day(r) < today_s]
-        past_done = [r for r in past if rget(r, "check_out_time")]
-        total_hours = sum(hrs(r) for r in active)
-
-        org_rows = self._db("getOrganizations", self.userID, default=None)
-        if org_rows is not None:
-            joined = sorted(
-                str(rget(r, "name", "")) for r in org_rows
-                if rget(r, "is_member", 0)
-            )
-        else:
-            joined = sorted({rget(r, "org_name") for r in active
-                             if rget(r, "org_name")})
-
-        self.tile_values["hours"].setText(f"{total_hours:.1f}")
-        self.tile_values["completed"].setText(str(len(completed)))
-        self.tile_values["upcoming"].setText(str(len(upcoming)))
-        self.tile_values["signups"].setText(str(len(active)))
-        self.tile_values["orgs"].setText(str(len(joined)))
-        self.tile_values["rate"].setText(
-            f"{round(100 * len(past_done) / len(past))}%" if past else "—"
-        )
-
-        self._refresh_recommendations(active)
-
-        if not upcoming:
-            self.dash_upcoming.addWidget(self._dash_text(
-                "Nothing coming up — find events in the Volunteer tab."))
-        for r in upcoming[:4]:
-            self.dash_upcoming.addWidget(self._dash_row(
-                org_color(rget(r, "org_name")),
-                str(rget(r, "title", "Untitled event")),
-                f"{date_range(r)}{time_range(r)} · "
-                f"{rget(r, 'org_name', 'Independent')}",
-            ))
-        if len(upcoming) > 4:
-            self.dash_upcoming.addWidget(
-                self._dash_text(f"+ {len(upcoming) - 4} more"))
-
-        totals = {}
-        for r in active:
-            totals[day(r)[:7]] = totals.get(day(r)[:7], 0.0) + hrs(r)
-        data = []
-        for back in range(5, -1, -1):
-            yy, mm = today.year, today.month - back
-            while mm <= 0:
-                mm += 12
-                yy -= 1
-            data.append((calendar.month_abbr[mm],
-                         totals.get(f"{yy:04d}-{mm:02d}", 0.0)))
-        self.dash_chart.set_data(data)
-
-        by_org = {}
-        for r in active:
-            name = rget(r, "org_name") or "Independent"
-            by_org[name] = by_org.get(name, 0.0) + hrs(r)
-        ranked = sorted(((n, v) for n, v in by_org.items() if v > 0),
-                        key=lambda t: -t[1])[:5]
-        if not ranked:
-            self.dash_org_hours.addWidget(
-                self._dash_text("No hours logged yet — check in at an event!"))
-        top_val = ranked[0][1] if ranked else 1.0
-        for name, v in ranked:
-            color = org_color(None if name == "Independent" else name)
-            row = QWidget()
-            h = QHBoxLayout(row)
-            h.setContentsMargins(0, 0, 0, 0)
-            h.setSpacing(8)
-            h.addWidget(self._swatch(color))
-            lbl = QLabel(name)
-            lbl.setFixedWidth(120)
-            bar = QProgressBar()
-            bar.setRange(0, 1000)
-            bar.setValue(int(v / top_val * 1000))
-            bar.setTextVisible(False)
-            bar.setFixedHeight(10)
-            bar.setStyleSheet(
-                "QProgressBar { border: none; border-radius: 5px;"
-                " background: rgba(127,127,127,50); }"
-                f"QProgressBar::chunk {{ background-color: {color};"
-                " border-radius: 5px; }"
-            )
-            hv = QLabel(f"{v:.1f} h")
-            h.addWidget(lbl)
-            h.addWidget(bar, 1)
-            h.addWidget(hv)
-            self.dash_org_hours.addWidget(row)
-
-        if not joined:
-            self.dash_orgs.addWidget(self._dash_text(
-                "You haven't joined any organizations yet."))
-        for name in joined[:6]:
-            self.dash_orgs.addWidget(self._dash_row(org_color(name), name))
-        if len(joined) > 6:
-            self.dash_orgs.addWidget(
-                self._dash_text(f"+ {len(joined) - 6} more"))
-
-        notifs = self._db("getNotifications", self.userID, default=[]) or []
-        notifs = sorted(notifs, key=lambda r: str(rget(r, "created_at", "")),
-                        reverse=True)[:3]
-        if not notifs:
-            self.dash_notifs.addWidget(self._dash_text("No notifications yet."))
-        for r in notifs:
-            lbl = QLabel(
-                f"<b>{html.escape(str(rget(r, 'created_at', '')))}</b> — "
-                f"{html.escape(str(rget(r, 'message', '')))}"
-            )
-            lbl.setObjectName(theme.EVENT_META_VALUE)
-            lbl.setWordWrap(True)
-            self.dash_notifs.addWidget(lbl)
-
-        for lay in (self.dash_upcoming, self.dash_org_hours,
-                    self.dash_orgs, self.dash_notifs):
-            lay.addStretch(1)
-
-    # ── Recommendations ───────────────────────────────────────────────────
+    # ── Recommendations ───────────────────────────────────────────────
     def _refresh_recommendations(self, active_signups):
         self._clear_all(self.dash_recommended)
 
         try:
-            from Volunteer.ml_recommender import explain_match, rank_opportunities
+            from Volunteer.ml_recommender import (
+                rank_opportunities,
+            )
         except ImportError:
             self.dash_recommended.addWidget(self._dash_text(
                 "Recommendations need scikit-learn. "
@@ -1629,19 +1505,23 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         all_opps = self._db("getAllOpportunities", default=None)
         if all_opps is None:
             self.dash_recommended.addWidget(self._dash_text(
-                "Add Database.getAllOpportunities() to enable recommendations."
+                "Add Database.getAllOpportunities() to enable "
+                "recommendations."
             ))
             return
 
-        user_profile = self._db("getUserProfile", self.userID) or self.user_data
-        joined_orgs = self._db("getOrganizations", self.userID, default=[]) or []
+        user_profile = (
+            self._db("getUserProfile", self.userID) or self.user_data
+        )
+        joined_orgs = self._db(
+            "getOrganizations", self.userID, default=[]
+        ) or []
 
-        # If the profile has no skills, the vectorizer has nothing to
-        # work with. Prompt instead of showing "no recommendations".
         skills = str(rget(user_profile, "skills", "") or "").strip()
         if not skills and not active_signups:
             lbl = QLabel(
-                "Add a few skills to your profile to unlock recommendations."
+                "Add a few skills to your profile to unlock "
+                "recommendations."
             )
             lbl.setObjectName(theme.VOLUNTEER_EMPTY)
             lbl.setWordWrap(True)
@@ -1656,7 +1536,7 @@ class VolunteerHome(VolunteerNotifications, QWidget):
 
         recs, scores = rank_opportunities(
             user_profile, active_signups, joined_orgs,
-            list(all_opps), top_n=5,
+            list(all_opps), top_n=4,
         )
 
         if not recs:
@@ -1666,21 +1546,74 @@ class VolunteerHome(VolunteerNotifications, QWidget):
             ))
             return
 
+        # Bookmarked IDs so card stars render correctly.
+        try:
+            bookmarked = self._db(
+                "getBookmarkedIDs", self.userID, default=set()
+            ) or set()
+        except Exception:
+            bookmarked = set()
+        self._bookmarked_ids = bookmarked
+
         for r, s in zip(recs, scores):
-            sub = (
-                f"{date_range(r)}{time_range(r)} · "
-                f"{rget(r, 'org_name', 'Independent')}"
+            card = EventCard(
+                r, view_mode="list",
+                current_volunteer_id=self.userID,
+                bookmarked_ids=bookmarked,
             )
-            if s > 0:
-                sub += f" · match {int(round(s * 100))}%"
-                reasons = explain_match(user_profile, r)
-                if reasons:
-                    sub += " · " + ", ".join(reasons)
-            self.dash_recommended.addWidget(self._dash_row(
-                org_color(rget(r, "org_name")),
-                str(rget(r, "title", "Untitled event")),
-                sub,
-            ))
+            card.set_bookmark_callback(self._on_rec_bookmark)
+            card.detailsRequested.connect(self._show_rec_details)
+            card.rsvpRequested.connect(self._handle_rec_rsvp)
+            self.dash_recommended.addWidget(card)
+
+    def _on_rec_bookmark(self, opportunityID, is_bookmarked):
+        if not self.userID:
+            return
+        result = self.db.toggleBookmark(self.userID, opportunityID)
+        if result == "added":
+            self._bookmarked_ids.add(opportunityID)
+        elif result == "removed":
+            self._bookmarked_ids.discard(opportunityID)
+
+    def _show_rec_details(self, card):
+        EventDetailsDialog(card, self).exec()
+
+    def _handle_rec_rsvp(self, opportunityID):
+        if not self.userID:
+            return
+        result = self.db.registerForOpportunity(
+            self.userID, opportunityID
+        )
+        if result == "ok":
+            try:
+                row = self.db.getOpportunityByID(opportunityID)
+                title = row["title"] if row else "an event"
+                self.db.addNotification(
+                    self.userID,
+                    f"You signed up for {title}.",
+                    "rsvp", opportunityID,
+                )
+            except Exception:
+                pass
+            QMessageBox.information(
+                self, "Registered",
+                "You're signed up! Check My Events.",
+            )
+            self._after_signup_change()
+        elif result == "duplicate":
+            QMessageBox.information(
+                self, "Already registered",
+                "You've already RSVP'd for this event.",
+            )
+        elif result == "full":
+            QMessageBox.warning(
+                self, "Event full",
+                "This event has reached capacity.",
+            )
+        else:
+            QMessageBox.warning(
+                self, "Error", "Could not complete RSVP."
+            )
 
     def _notify_upcoming_events(self, rows):
         now = datetime.now()
@@ -1693,7 +1626,9 @@ class VolunteerHome(VolunteerNotifications, QWidget):
                 event_date = date.fromisoformat(
                     str(rget(row, "event_date", ""))[:10]
                 )
-                start_text = str(rget(row, "start_time", "") or "09:00")
+                start_text = str(
+                    rget(row, "start_time", "") or "09:00"
+                )
                 start_time = time.fromisoformat(start_text[:8])
             except ValueError:
                 continue
@@ -1733,7 +1668,8 @@ class VolunteerHome(VolunteerNotifications, QWidget):
         if not path:
             return
         try:
-            with open(path, "w", newline="", encoding="utf-8-sig") as file:
+            with open(path, "w", newline="",
+                      encoding="utf-8-sig") as file:
                 writer = csv.writer(file)
                 writer.writerow(["Moxie volunteer impact record"])
                 writer.writerow([
@@ -1754,7 +1690,8 @@ class VolunteerHome(VolunteerNotifications, QWidget):
                     ])
         except OSError as exc:
             QMessageBox.warning(
-                self, "Export failed", f"Could not save the impact record:\n{exc}"
+                self, "Export failed",
+                f"Could not save the impact record:\n{exc}",
             )
             return
         QMessageBox.information(

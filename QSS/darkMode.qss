@@ -1627,3 +1627,68 @@ QPushButton#HeroLearnBtn:pressed {
     border-color: #7B8BE0;
     color: #7B8BE0;
 }
+/* ==========================================================================
+   FILTER SIDEBAR
+   ========================================================================== */
+#FilterSidebar {
+    background-color: #2A1F33;
+    border-right: 1px solid #4A3A54;
+}
+#FilterSidebarScroll,
+#FilterSidebarScroll > QWidget#qt_scrollarea_viewport,
+#FilterSidebarContent {
+    background-color: #2A1F33;
+    border: none;
+}
+#FilterSidebarHeading {
+    font-size: 11px;
+    font-weight: 800;
+    color: #9C8EA9;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    padding: 6px 0 2px 0;
+}
+#FilterSidebarInput {
+    background-color: #251A2E;
+    border: 1px solid #4A3A54;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: #EDE6F2;
+    min-height: 18px;
+}
+#FilterSidebarInput:focus {
+    border: 2px solid #7B8BE0;
+    padding: 8px 11px;
+    background-color: #352543;
+}
+#FilterSidebarRadio,
+#FilterSidebarCheck {
+    font-size: 13px;
+    color: #EDE6F2;
+    spacing: 8px;
+    padding: 4px 0;
+}
+#FilterSidebarRadio::indicator,
+#FilterSidebarCheck::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #4A3A54;
+    background-color: #251A2E;
+}
+#FilterSidebarCheck::indicator:checked,
+#FilterSidebarRadio::indicator:checked {
+    background-color: #7B8BE0;
+    border-color: #7B8BE0;
+}
+#FilterSidebarClear {
+    background-color: #B39CDB;
+    color: #1E1626;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 12px;
+    border: none;
+    margin: 8px;
+}
+#FilterSidebarClear:hover {
+    background-color: #7B8BE0;
+}

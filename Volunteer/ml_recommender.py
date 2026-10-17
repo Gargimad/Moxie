@@ -1,15 +1,10 @@
 """
-ml_recommender.py — Unsupervised content-based recommendation.
+ml_recommender.py - Unsupervised content-based recommendation.
 
-Model:
-    • TF-IDF vectorization of opportunity text (fit per request)
-    • Cosine similarity between the user-profile vector and each
-      opportunity vector
-    • Ranked descending by similarity
-
-No training, no persistence. The vectorizer is fit on whatever corpus
-is in the DB at request time. This is the standard cold-start baseline
-for recommendation systems and requires only scikit-learn.
+Past signups are repeated 3x in the user document so TF-IDF weights
+behavior above static profile fields. This makes the recommender
+"learn" from what the volunteer has actually chosen to do, without
+needing a persisted model.
 """
 
 import re
@@ -32,7 +27,6 @@ def _clean(text):
 
 
 def _opp_doc(row):
-    """One opportunity as a single document string."""
     return _clean(" ".join([
         _get(row, "title"),
         _get(row, "description"),
@@ -44,22 +38,31 @@ def _opp_doc(row):
 
 
 def _user_doc(user_row, signup_rows, joined_org_rows):
-    """The volunteer's interest profile as a single document string."""
     parts = [
         _get(user_row, "skills"),
         _get(user_row, "country"),
         _get(user_row, "zipcode"),
     ]
-    for r in signup_rows:
-        parts.append(_get(r, "activity"))
-        parts.append(_get(r, "required_skills"))
     for r in joined_org_rows:
         parts.append(_get(r, "activity"))
+
+    # Signups weighted 3x so TF-IDF amplifies behavior.
+    for r in signup_rows:
+        signup_text = " ".join(filter(None, [
+            _get(r, "title"),
+            _get(r, "description"),
+            _get(r, "category"),
+            _get(r, "required_skills"),
+        ]))
+        if signup_text:
+            parts.append(signup_text)
+            parts.append(signup_text)
+            parts.append(signup_text)
+
     return _clean(" ".join(p for p in parts if p))
 
 
 def explain_match(user_row, opportunity_row):
-    """Return short, evidence-based reasons for a recommendation."""
     user_skills = {
         _clean(term) for term in re.split(
             r"[,;|]", str(_get(user_row, "skills"))
@@ -84,11 +87,6 @@ def explain_match(user_row, opportunity_row):
 
 def rank_opportunities(user_row, signup_rows, joined_org_rows,
                        candidate_rows, top_n=6):
-    """
-    Returns (ranked_rows, scores) — same length, sorted by score desc.
-    Excludes opportunities the volunteer has already signed up for.
-    Falls back to soonest-upcoming when the user profile is empty.
-    """
     if not candidate_rows:
         return [], []
 

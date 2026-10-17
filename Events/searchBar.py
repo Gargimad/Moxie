@@ -159,7 +159,8 @@ class SearchBar(QWidget):
 
     # ── Input events ──────────────────────────────────────────────────
     def _on_text_changed(self, text):
-        self.clear_action.setVisible(bool(text))
+        if hasattr(self, "clear_action"):
+            self.clear_action.setVisible(bool(text))
         if text:
             self.suggestions.setVisible(False)
 

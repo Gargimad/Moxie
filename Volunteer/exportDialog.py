@@ -1,19 +1,18 @@
 """
-exportDialog.py — Volunteer data export (CSV + PDF).
+exportDialog.py - Volunteer data export (CSV + PDF).
 
-Datasets: hours log, event registrations, bookmarks.
-Format: CSV (native) or PDF (QPdfWriter — no external dep).
+Hours dataset has a "Verified only" toggle so volunteers can produce a
+clean record for NHS, honor societies, or award applications.
 """
 import csv
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QRectF
+from PyQt6.QtCore import Qt, QRectF, QDate
 from PyQt6.QtGui import QPainter, QPdfWriter, QPageSize, QFont, QPageLayout
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
-    QDateEdit, QMessageBox, QFileDialog, QFrame,
+    QDateEdit, QMessageBox, QFileDialog, QFrame, QCheckBox,
 )
-from PyQt6.QtCore import QDate
 
 import Events.theme as theme
 
@@ -40,6 +39,7 @@ class ExportDialog(QDialog):
         title = QLabel("Export my data")
         title.setObjectName(theme.EVENT_TITLE_LIST)
         v.addWidget(title)
+
         sub = QLabel(
             "Pick a dataset, a date range, and a format. Exports only "
             "include your own information."
@@ -58,12 +58,22 @@ class ExportDialog(QDialog):
         self.dataset_combo = QComboBox()
         for key, label in self.DATASETS:
             self.dataset_combo.addItem(label, key)
+        self.dataset_combo.setAccessibleName("Export dataset")
         cv.addWidget(self.dataset_combo)
+
+        self.verified_only = QCheckBox(
+            "Verified hours only (for NHS, honor societies, awards)"
+        )
+        self.verified_only.setAccessibleName(
+            "Only include verified hours in the export"
+        )
+        cv.addWidget(self.verified_only)
 
         cv.addWidget(QLabel("Format"))
         self.format_combo = QComboBox()
         self.format_combo.addItem("CSV (.csv)", "csv")
         self.format_combo.addItem("PDF report (.pdf)", "pdf")
+        self.format_combo.setAccessibleName("Export format")
         cv.addWidget(self.format_combo)
 
         cv.addWidget(QLabel("From"))
@@ -71,6 +81,7 @@ class ExportDialog(QDialog):
         self.from_date.setCalendarPopup(True)
         self.from_date.setDisplayFormat("yyyy-MM-dd")
         self.from_date.setDate(QDate.currentDate().addMonths(-6))
+        self.from_date.setAccessibleName("Export from date")
         cv.addWidget(self.from_date)
 
         cv.addWidget(QLabel("To"))
@@ -78,6 +89,7 @@ class ExportDialog(QDialog):
         self.to_date.setCalendarPopup(True)
         self.to_date.setDisplayFormat("yyyy-MM-dd")
         self.to_date.setDate(QDate.currentDate())
+        self.to_date.setAccessibleName("Export to date")
         cv.addWidget(self.to_date)
 
         v.addWidget(card)
@@ -93,6 +105,15 @@ class ExportDialog(QDialog):
         export.clicked.connect(self._export)
         row.addWidget(export)
         v.addLayout(row)
+
+        self.dataset_combo.currentIndexChanged.connect(
+            self._on_dataset_changed
+        )
+        self._on_dataset_changed()
+
+    def _on_dataset_changed(self):
+        is_hours = self.dataset_combo.currentData() == "hours"
+        self.verified_only.setVisible(is_hours)
 
     def _export(self):
         ds = self.dataset_combo.currentData()
@@ -123,18 +144,24 @@ class ExportDialog(QDialog):
             self._write_pdf(path, ds, headers, rows)
 
         QMessageBox.information(
-            self, "Export complete", f"Saved {len(rows)} rows to:\n{path}"
+            self, "Export complete",
+            f"Saved {len(rows)} rows to:\n{path}"
         )
         self.accept()
 
     def _fetch(self, ds, d_from, d_to):
         if ds == "hours":
+            only_verified = self.verified_only.isChecked()
             headers = ["Date", "Event", "Organization", "Hours", "Verified"]
             rows = []
             signups = self.db.getSignupsForVolunteer(self.userID) or []
             for r in signups:
                 d = str(r["event_date"] or "")[:10]
                 if not d or d < d_from or d > d_to:
+                    continue
+                if r["no_show"]:
+                    continue
+                if only_verified and not r["verified"]:
                     continue
                 rows.append([
                     d,
@@ -162,7 +189,6 @@ class ExportDialog(QDialog):
                 ])
             return rows, headers
 
-        # bookmarks
         headers = ["Bookmarked at", "Event", "Event date", "Org", "Clusters"]
         rows = []
         marks = self.db.getBookmarkedOpportunities(self.userID) or []
@@ -189,57 +215,53 @@ class ExportDialog(QDialog):
     def _write_pdf(self, path, ds, headers, rows):
         writer = QPdfWriter(path)
         writer.setPageSize(QPageSize(QPageSize.PageSizeId.Letter))
-        writer.setPageMargins(
-            QPageLayout().margins()  # default Letter margins
-        )
+        writer.setPageMargins(QPageLayout().margins())
         writer.setResolution(150)
 
-        painter = QPainter(writer)
-        painter.begin(writer)
+        painter = QPainter(writer)   # begins implicitly, do NOT call begin()
+        try:
+            base = QFont("Helvetica", 10)
+            heading = QFont("Helvetica", 16, QFont.Weight.Bold)
+            sub = QFont("Helvetica", 10, QFont.Weight.Normal)
 
-        base = QFont("Helvetica", 10)
-        heading = QFont("Helvetica", 16, QFont.Weight.Bold)
-        sub = QFont("Helvetica", 10, QFont.Weight.Normal)
-
-        # Header
-        painter.setFont(heading)
-        painter.drawText(
-            QRectF(0, 0, writer.width(), 400),
-            Qt.AlignmentFlag.AlignLeft,
-            "Moxie data export",
-        )
-        painter.setFont(sub)
-        painter.drawText(
-            QRectF(0, 300, writer.width(), 200),
-            Qt.AlignmentFlag.AlignLeft,
-            f"{ds} · generated {datetime.now():%Y-%m-%d %H:%M}",
-        )
-
-        # Table
-        painter.setFont(base)
-        col_w = writer.width() // max(1, len(headers))
-        y = 600
-        row_h = 260
-
-        for i, h in enumerate(headers):
+            painter.setFont(heading)
             painter.drawText(
-                QRectF(i * col_w, y, col_w, row_h),
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                str(h),
+                QRectF(0, 0, writer.width(), 400),
+                Qt.AlignmentFlag.AlignLeft,
+                "Moxie data export",
             )
-        y += row_h
+            painter.setFont(sub)
+            painter.drawText(
+                QRectF(0, 300, writer.width(), 200),
+                Qt.AlignmentFlag.AlignLeft,
+                f"{ds} - generated {datetime.now():%Y-%m-%d %H:%M}",
+            )
 
-        for row in rows:
-            if y > writer.height() - 400:
-                writer.newPage()
-                y = 300
-            for i, cell in enumerate(row):
+            painter.setFont(base)
+            col_w = writer.width() // max(1, len(headers))
+            y = 600
+            row_h = 260
+
+            for i, h in enumerate(headers):
                 painter.drawText(
                     QRectF(i * col_w, y, col_w, row_h),
                     Qt.AlignmentFlag.AlignLeft
                     | Qt.AlignmentFlag.AlignVCenter,
-                    str(cell),
+                    str(h),
                 )
             y += row_h
 
-        painter.end()
+            for row in rows:
+                if y > writer.height() - 400:
+                    writer.newPage()
+                    y = 300
+                for i, cell in enumerate(row):
+                    painter.drawText(
+                        QRectF(i * col_w, y, col_w, row_h),
+                        Qt.AlignmentFlag.AlignLeft
+                        | Qt.AlignmentFlag.AlignVCenter,
+                        str(cell),
+                    )
+                y += row_h
+        finally:
+            painter.end()

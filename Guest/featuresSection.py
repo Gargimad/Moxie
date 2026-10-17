@@ -1,16 +1,6 @@
 """
 featuresSection.py - The three-card "what Moxie offers" section.
-
-Each FeatureCard is an image + title + description tile that:
-  * expands to share the row evenly with its siblings (so full-screen
-    doesn't leave big empty gutters), and
-  * emits `clicked` when the user releases the left mouse button inside
-    it, so the parent section can route to the right page.
-
-Image paths resolve through theme.asset() so moving assets/ around is a
-one-line change.
 """
-
 import os
 
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -23,13 +13,6 @@ import Events.theme as theme
 
 
 class _FeatureImage(QLabel):
-    """Cover-cropped image that rescales with the card.
-
-    Scales the source pixmap with KeepAspectRatioByExpanding and centers
-    the crop, so the image always fills the label edge-to-edge without
-    distortion, at any card size.
-    """
-
     def __init__(self, path: str, parent=None):
         super().__init__(parent)
         self._source = QPixmap(path) if path else QPixmap()
@@ -61,14 +44,7 @@ class _FeatureImage(QLabel):
 
 
 class FeatureCard(QFrame):
-    """A single feature tile: image on top, title + description below.
-
-    Emits `clicked` when the user releases the left mouse button inside
-    the card. The parent section routes each card to the right page.
-    """
-
     clicked = pyqtSignal()
-
     MIN_WIDTH = 260
     MIN_HEIGHT = 320
 
@@ -80,12 +56,12 @@ class FeatureCard(QFrame):
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Preferred)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.setAccessibleName(title)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # ── Image (fills the card width, grows in full-screen) ────────
         path = (image_filename if os.path.isabs(image_filename)
                 else theme.asset(image_filename))
         if not os.path.exists(path):
@@ -93,7 +69,6 @@ class FeatureCard(QFrame):
         self.image = _FeatureImage(path, self)
         layout.addWidget(self.image, 1)
 
-        # ── Text block ───────────────────────────────────────────────
         text_wrap = QVBoxLayout()
         text_wrap.setContentsMargins(22, 16, 22, 22)
         text_wrap.setSpacing(8)
@@ -119,35 +94,22 @@ class FeatureCard(QFrame):
 
 
 class FeaturesSection(QWidget):
-    """Three-card row on the guest home page.
-
-    Swap the images by changing the filenames below; they resolve against
-    assets/. Each card emits a distinct signal so landing.py can route the
-    user to the right page.
-    """
-
     discoverRequested = pyqtSignal()
     postRequested = pyqtSignal()
     manageRequested = pyqtSignal()
 
     CARDS = [
-        (
-            "discoverOpportunitiesImg.jpg",
-            "Discover Volunteering Opportunities",
-            "Browse volunteering opportunities and events from organizations "
-            "near you or fully remote.",
-        ),
-        (
-            "postVolunteerOpportunities.jpg",
-            "Post Volunteering Opportunities",
-            "Post volunteering opportunities and events for your organization "
-            "in minutes.",
-        ),
-        (
-            "trackVolunteers.jpg",
-            "Manage Volunteers Seamlessly",
-            "Recruit, manage, and communicate with your volunteer team.",
-        ),
+        ("discoverOpportunitiesImg.jpg",
+         "Discover Volunteering Opportunities",
+         "Browse volunteering opportunities and events from "
+         "organizations near you or fully remote."),
+        ("postVolunteerOpportunities.jpg",
+         "Post Volunteering Opportunities",
+         "Post volunteering opportunities and events for your "
+         "organization in minutes."),
+        ("trackVolunteers.jpg",
+         "Manage Volunteers Seamlessly",
+         "Recruit, manage, and communicate with your volunteer team."),
     ]
 
     def __init__(self, parent=None):
@@ -167,9 +129,6 @@ class FeaturesSection(QWidget):
         cards_row = QHBoxLayout()
         cards_row.setSpacing(22)
 
-        # Every card gets a stretch factor of 1 so they share the
-        # available width evenly — this is what makes them grow on
-        # full-screen instead of staying at a fixed width.
         self.cards = []
         for idx, (filename, title, desc) in enumerate(self.CARDS):
             card = FeatureCard(filename, title, desc)
@@ -181,7 +140,6 @@ class FeaturesSection(QWidget):
         outer.addLayout(cards_row, 1)
 
     def _emit_for(self, idx):
-        """Return the right signal-emitter for a card index."""
         if idx == 0:
             return self.discoverRequested.emit
         if idx == 1:

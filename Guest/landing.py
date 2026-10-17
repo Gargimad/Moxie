@@ -4,15 +4,11 @@ landing.py - Main window and navigation for Moxie.
 Owns the QStackedWidget of pages (guest home, register, login, volunteer
 home, FAQ, volunteer listing, org dashboard) plus the session-aware nav
 bar, the guest search bar, and the global mic button.
-
-The guest home hero is rendered by HeroSection (heroSection.py); the
-three feature cards emit their own signals so they can route to
-different pages.
 """
 
 import webbrowser
 
-from PyQt6.QtCore import Qt, QSettings
+from PyQt6.QtCore import Qt, QSettings, QTimer
 from PyQt6.QtGui import QAction, QIcon, QPixmap, QCursor
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -50,22 +46,6 @@ PAGE_ORG_DASH = 7
 NAV_GUEST, NAV_VOLUNTEER, NAV_ORG = "guest", "volunteer", "org"
 
 
-# ── Grouped navigation specs (≤ 5 groups per session) ─────────────────
-# Each group is a dropdown menu; items dispatch through _dispatch_nav.
-# Action names understood by _dispatch_nav:
-#   vol_tab           -> show volunteer tab (arg = tab index)
-#   vol_list          -> show volunteer listing page
-#   vol_match         -> show Volunteer Match page
-#   org_nav           -> show org nav tab (arg = nav index in TAB_LABELS)
-#   show_faq          -> FAQ page
-#   open_export       -> export dialog
-#   handle_logout     -> volunteer logout
-#   handle_org_logout -> org logout
-#   toggle_theme      -> dark / light switch
-#   show_login        -> login page
-#   show_vol_register -> volunteer registration
-#   show_org_register -> organization registration
-
 VOLUNTEER_NAV_GROUPS = [
     ("Home",        [("Dashboard", "vol_tab", 0),
                      ("Notifications", "vol_tab", 4)]),
@@ -82,11 +62,13 @@ VOLUNTEER_NAV_GROUPS = [
                      ("Log out", "handle_logout", None)]),
 ]
 
+# NOTE: nav_idx 6 routes via NAV_TO_STACK[6] = TAB_RECOMMENDATIONS.
+# Label was previously "Check-in codes" (wrong); now "Recommendations".
 ORG_NAV_GROUPS = [
     ("Home",          [("Overview", "org_nav", 0),
                        ("Announcements", "org_nav", 4)]),
     ("Opportunities", [("My opportunities", "org_nav", 1),
-                       ("Check-in codes", "org_nav", 6)]),
+                       ("Recommendations", "org_nav", 6)]),
     ("People",        [("Volunteers", "org_nav", 2),
                        ("Reports", "org_nav", 3)]),
     ("Data",          [("Data migration", "org_nav", 5)]),
@@ -138,10 +120,16 @@ class Landing(QMainWindow):
         theme.apply_theme(self._app(), self.is_dark_mode)
         self._update_logos()
         self._sync_search_bar_visibility()
-
         self._refresh_home_carousels()
 
-    # ── UI construction ───────────────────────────────────────────────
+        # ── Notification badge polling (every 30s) ─────────────────
+        self._notif_timer = QTimer(self)
+        self._notif_timer.setInterval(30_000)
+        self._notif_timer.timeout.connect(self._refresh_notif_badge)
+        self._notif_timer.start()
+        self._refresh_notif_badge()
+
+    # ── UI construction ───────────────────────────────────────────
     def _build_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
@@ -165,11 +153,6 @@ class Landing(QMainWindow):
         layout.addWidget(self.pageStack, 1)
 
     def _build_nav(self):
-        """
-        Top bar: logo on the left, grouped nav in the middle, theme
-        toggle on the right. The old Register / Login buttons live
-        inside the Account group so the bar stays compact.
-        """
         nav = QWidget()
         nav.setObjectName(theme.navBar)
         h = QHBoxLayout(nav)
@@ -198,9 +181,18 @@ class Landing(QMainWindow):
         )
         self.btnThemeToggle.clicked.connect(self.toggle_theme)
 
+        # NEW: unread-notification badge
+        self.notif_badge = QLabel("0")
+        self.notif_badge.setStyleSheet(
+            "background:#C62828; color:white; border-radius:9px;"
+            " font-size:10px; font-weight:bold; padding:2px 6px;"
+        )
+        self.notif_badge.setVisible(False)
+
         h.addWidget(self.nav_logo)
         h.addStretch()
         h.addWidget(self.navTabs)
+        h.addWidget(self.notif_badge)   # NEW
         h.addWidget(self.btnThemeToggle)
         return nav
 
@@ -294,7 +286,6 @@ class Landing(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Mission-style hero
         self.hero_widget = self._build_hero()
         layout.addWidget(self.hero_widget, 0)
 
@@ -328,18 +319,12 @@ class Landing(QMainWindow):
         return page
 
     def _build_hero(self):
-        """Mission-style hero: layered image left, mission right,
-        Learn More button."""
         hero = HeroSection()
         hero.learnMoreRequested.connect(self.show_volunteer_listing_page)
         return hero
 
-    # ── Session-aware nav bar (grouped) ───────────────────────────────
+    # ── Session-aware nav bar (grouped) ───────────────────────────
     def _set_nav_mode(self, mode):
-        """
-        Rebuild the top nav. Every session gets at most 5 groups, each
-        a dropdown. Only the items inside change per session.
-        """
         self.nav_mode = mode
 
         while self.navTabsLayout.count():
@@ -371,7 +356,6 @@ class Landing(QMainWindow):
             self.navTabsLayout.addWidget(btn)
 
     def _dispatch_nav(self, action, arg):
-        """Route a nav-group click to the right page or callback."""
         if action == "vol_tab":
             self.show_volunteer_tab(arg)
         elif action == "vol_list":
@@ -403,11 +387,11 @@ class Landing(QMainWindow):
     def _sync_nav_highlight(self):
         return
 
-    # ── Signals ───────────────────────────────────────────────────────
+    # ── Signals ───────────────────────────────────────────────────
     def _wire_signals(self):
         self.searchBar.searchRequested.connect(self.handle_search)
 
-    # ── Navigation helpers ────────────────────────────────────────────
+    # ── Navigation helpers ────────────────────────────────────────
     def _goto(self, page_widget):
         self.pageStack.setCurrentWidget(page_widget)
         self._sync_search_bar_visibility()
@@ -429,18 +413,18 @@ class Landing(QMainWindow):
     def show_volunteer_tab(self, idx):
         self._goto(self.volunteerHomePage)
         self.volunteerHomePage.show_tab(idx)
+        # Opening the notifications tab should clear the badge count
+        # on the next poll; volunteerNotifications marks them read.
+        if idx == 4:
+            self._refresh_notif_badge()
 
     def show_org_tab(self, idx):
-        """Show a stack page directly on the org dashboard."""
         self._goto(self.orgDashboard)
         show = getattr(self.orgDashboard, "show_tab", None)
         if callable(show):
             show(idx)
 
     def _show_org_nav_tab(self, nav_idx):
-        """Called by the org nav buttons. nav_idx is a position in
-        OrgDashboard.TAB_LABELS, translated to a stack index by the
-        dashboard itself (the form page has no nav button)."""
         self._goto(self.orgDashboard)
         fn = getattr(self.orgDashboard, "show_nav_tab", None)
         if callable(fn):
@@ -478,7 +462,7 @@ class Landing(QMainWindow):
         else:
             self.show_login_page()
 
-    # ── Volunteer Match ───────────────────────────────────────────────
+    # ── Volunteer Match ───────────────────────────────────────────
     def show_volunteer_match_page(self):
         if not self.current_user:
             QMessageBox.information(
@@ -496,18 +480,18 @@ class Landing(QMainWindow):
         self.matchPage.set_volunteer(self.current_user["userID"])
         self._goto(self.matchPage)
 
-    # ── Export dialog ─────────────────────────────────────────────────
+    # ── Export dialog ─────────────────────────────────────────────
     def _open_export_dialog(self):
         if not self.current_user:
             return
         from Volunteer.exportDialog import ExportDialog
         ExportDialog(self.db, self.current_user["userID"], self).exec()
 
-    # ── Registration callback ─────────────────────────────────────────
+    # ── Registration callback ─────────────────────────────────────
     def _handle_registration_success(self, userID):
         self.show_login_page()
 
-    # ── Login callback ────────────────────────────────────────────────
+    # ── Login callback ────────────────────────────────────────────
     def _handle_login_success(self, user):
         if user["role"] == "volunteer":
             self.current_user = user
@@ -523,21 +507,24 @@ class Landing(QMainWindow):
             self._set_nav_mode(NAV_ORG)
             self.orgDashboard.set_org_data(user)
             self._goto(self.orgDashboard)
+        self._refresh_notif_badge()
 
-    # ── Logout callbacks ──────────────────────────────────────────────
+    # ── Logout callbacks ──────────────────────────────────────────
     def handle_logout(self):
         self.current_user = None
         self.volunteerListingPage.set_current_volunteer(None)
         self._set_nav_mode(NAV_GUEST)
         self._refresh_home_carousels()
         self._goto(self.guestHomePage)
+        self._refresh_notif_badge()
 
     def handle_org_logout(self):
         self.current_org = None
         self._set_nav_mode(NAV_GUEST)
         self._goto(self.guestHomePage)
+        self._refresh_notif_badge()
 
-    # ── RSVP callbacks ────────────────────────────────────────────────
+    # ── RSVP callbacks ────────────────────────────────────────────
     def _handle_rsvp_success(self, opportunity_id):
         if not self.current_user:
             return
@@ -545,10 +532,6 @@ class Landing(QMainWindow):
         self.volunteerHomePage.show_my_events()
 
     def _handle_home_rsvp(self, opportunity_id):
-        """RSVP from the guest-home carousels. The guest home is only
-        shown when no user is logged in, so this almost always lands on
-        the login prompt — but the logged-in branch is here for
-        completeness."""
         if not self.current_user:
             QMessageBox.information(
                 self, "Login required",
@@ -589,11 +572,10 @@ class Landing(QMainWindow):
             QMessageBox.warning(self, "Error", "Could not complete RSVP.")
 
     def _open_event_details(self, card):
-        """Open the same EventDetailsDialog the listing page uses."""
         from Events.eventDetailsDialog import EventDetailsDialog
         EventDetailsDialog(card, self).exec()
 
-    # ── Home carousels ────────────────────────────────────────────────
+    # ── Home carousels ────────────────────────────────────────────
     def _refresh_home_carousels(self):
         if not hasattr(self, "opportunitiesSection"):
             return
@@ -606,10 +588,8 @@ class Landing(QMainWindow):
         except Exception as e:
             print("Failed to refresh home carousels:", e)
 
-    # ── Search ────────────────────────────────────────────────────────
+    # ── Search ────────────────────────────────────────────────────
     def handle_search(self, filters: dict):
-        """SearchBar emits a full filter dict; forward it to the
-        listing page's FilterBar so its widgets reflect the query."""
         if not filters:
             return
         self.show_volunteer_listing_page(filters=filters)
@@ -618,7 +598,7 @@ class Landing(QMainWindow):
         if url:
             webbrowser.open(url)
 
-    # ── Theme ─────────────────────────────────────────────────────────
+    # ── Theme ─────────────────────────────────────────────────────
     def toggle_theme(self):
         self.is_dark_mode = not self.is_dark_mode
         self.settings.setValue(
@@ -637,12 +617,33 @@ class Landing(QMainWindow):
         nav_pixmap = QPixmap(path).scaledToHeight(46, smooth)
         self.nav_logo.setPixmap(nav_pixmap)
 
-        # Keep the hero wordmark in sync with the theme.
         if (hasattr(self, "hero_widget")
                 and hasattr(self.hero_widget, "set_theme")):
             self.hero_widget.set_theme(self.is_dark_mode)
 
-    # ── Hero sizing ───────────────────────────────────────────────────
+    # ── Notification badge ────────────────────────────────────────
+    def _refresh_notif_badge(self):
+        """Poll the DB and update the badge with the unread count.
+
+        Badge only shows for volunteers. `read_at` is populated when the
+        notifications tab is opened (see volunteerNotifications.py)."""
+        if not self.current_user:
+            self.notif_badge.setVisible(False)
+            return
+        try:
+            rows = self.db.getNotifications(
+                self.current_user["userID"], limit=50
+            ) or []
+        except Exception:
+            return
+        unread = sum(1 for r in rows if not r["read_at"])
+        if unread:
+            self.notif_badge.setText(str(unread))
+            self.notif_badge.setVisible(True)
+        else:
+            self.notif_badge.setVisible(False)
+
+    # ── Hero sizing ───────────────────────────────────────────────
     def _sync_hero_height(self):
         return
 
@@ -652,7 +653,7 @@ class Landing(QMainWindow):
             self.global_mic.reposition()
             self.global_mic.raise_()
 
-    # ── Utilities ─────────────────────────────────────────────────────
+    # ── Utilities ─────────────────────────────────────────────────
     def _app(self):
         return QApplication.instance()
 

@@ -1,8 +1,12 @@
 """
 volunteerMatch.py — Multi-step "find your volunteering match" wizard.
+
 Step 1: Georgia city + (optional) high school
 Step 2: pick exactly 3 career clusters
 Step 3: ranked results (cluster overlap + city + school scoring)
+
+Results use the same EventCard as the volunteer listing page, so
+every event in the app looks the same.
 """
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QCursor
@@ -13,8 +17,12 @@ from PyQt6.QtWidgets import (
 
 import Events.theme as theme
 from Events.careerClusters import CAREER_CLUSTERS
-from Events.gaLocations import GA_CITIES, ALL_CITIES, ALL_SCHOOLS, schools_for_city
 from Events.dateFormat import format_event_when
+from Events.eventCard import EventCard
+from Events.eventDetailsDialog import EventDetailsDialog
+from Events.gaLocations import (
+    GA_CITIES, ALL_CITIES, ALL_SCHOOLS, schools_for_city,
+)
 
 
 class VolunteerMatch(QWidget):
@@ -28,6 +36,7 @@ class VolunteerMatch(QWidget):
         self.db = db
         self.userID = None
         self._selected_clusters = []
+        self._bookmarked_ids = set()
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(40, 24, 40, 24)
@@ -38,9 +47,9 @@ class VolunteerMatch(QWidget):
         outer.addWidget(title)
 
         sub = QLabel(
-            "Answer two quick questions. We'll rank opportunities and "
-            "organizations in the career clusters you care about, near "
-            "the Georgia city you choose."
+            "Answer two quick questions. We'll rank opportunities "
+            "in the career clusters you care about, near the Georgia "
+            "city you choose."
         )
         sub.setObjectName(theme.EVENT_META_VALUE)
         sub.setWordWrap(True)
@@ -74,7 +83,9 @@ class VolunteerMatch(QWidget):
         self.city_combo.addItem(ALL_CITIES)
         for c in GA_CITIES:
             self.city_combo.addItem(c)
-        self.city_combo.currentTextChanged.connect(self._on_city_changed)
+        self.city_combo.currentTextChanged.connect(
+            self._on_city_changed
+        )
         cl.addWidget(self.city_combo)
 
         cl.addWidget(QLabel("High school (optional)"))
@@ -90,7 +101,9 @@ class VolunteerMatch(QWidget):
         next_btn = QPushButton("Next")
         next_btn.setObjectName(theme.PRIMARY_BTN)
         next_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        next_btn.clicked.connect(lambda: self.stack.setCurrentIndex(1))
+        next_btn.clicked.connect(
+            lambda: self.stack.setCurrentIndex(1)
+        )
         row.addWidget(next_btn)
         v.addLayout(row)
         return page
@@ -112,7 +125,9 @@ class VolunteerMatch(QWidget):
         h.setObjectName(theme.MATCH_STEP_TITLE)
         v.addWidget(h)
 
-        hint = QLabel("Choose the three clusters you're most curious about.")
+        hint = QLabel(
+            "Choose the three clusters you're most curious about."
+        )
         hint.setObjectName(theme.EVENT_META_VALUE)
         v.addWidget(hint)
 
@@ -151,7 +166,9 @@ class VolunteerMatch(QWidget):
         row.addStretch(1)
         self.next_btn_2 = QPushButton("Show my matches")
         self.next_btn_2.setObjectName(theme.PRIMARY_BTN)
-        self.next_btn_2.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.next_btn_2.setCursor(
+            QCursor(Qt.CursorShape.PointingHandCursor)
+        )
         self.next_btn_2.clicked.connect(self._run_match)
         row.addWidget(self.next_btn_2)
         v.addLayout(row)
@@ -170,7 +187,9 @@ class VolunteerMatch(QWidget):
         else:
             if name in self._selected_clusters:
                 self._selected_clusters.remove(name)
-        self.next_btn_2.setEnabled(len(self._selected_clusters) == 3)
+        self.next_btn_2.setEnabled(
+            len(self._selected_clusters) == 3
+        )
 
     # ── Step 3 ────────────────────────────────────────────────────────
     def _build_step_results(self):
@@ -195,7 +214,7 @@ class VolunteerMatch(QWidget):
         content = QWidget()
         self.results_layout = QVBoxLayout(content)
         self.results_layout.setContentsMargins(0, 0, 0, 0)
-        self.results_layout.setSpacing(8)
+        self.results_layout.setSpacing(12)
         self.results_layout.addStretch(1)
         scroll.setWidget(content)
         v.addWidget(scroll, 1)
@@ -216,6 +235,13 @@ class VolunteerMatch(QWidget):
     # ── Matching ──────────────────────────────────────────────────────
     def set_volunteer(self, userID):
         self.userID = userID
+        if userID:
+            try:
+                self._bookmarked_ids = (
+                    self.db.getBookmarkedIDs(userID) or set()
+                )
+            except Exception:
+                self._bookmarked_ids = set()
 
     def _run_match(self):
         if self.userID is None:
@@ -254,7 +280,8 @@ class VolunteerMatch(QWidget):
 
         for r in rows:
             opp_clusters = set(
-                self.db.getOpportunityClusters(r["opportunityID"]) or []
+                self.db.getOpportunityClusters(r["opportunityID"])
+                or []
             )
             overlap = len(cluster_set & opp_clusters)
             if overlap == 0:
@@ -290,47 +317,83 @@ class VolunteerMatch(QWidget):
 
         if not scored:
             empty = QLabel(
-                "No events match yet. Try different clusters or browse "
-                "everything in the Volunteer tab."
+                "No events match yet. Try different clusters or "
+                "browse everything in the Volunteer tab."
             )
             empty.setObjectName(theme.VOLUNTEER_EMPTY)
             empty.setWordWrap(True)
             self.results_layout.insertWidget(0, empty)
             return
 
+        # Refresh bookmarked set for the cards.
+        if self.userID:
+            try:
+                self._bookmarked_ids = (
+                    self.db.getBookmarkedIDs(self.userID) or set()
+                )
+            except Exception:
+                self._bookmarked_ids = set()
+
+        # Same EventCard as the volunteer listing page, so every event
+        # in the app has the same visual treatment.
         for score, r in scored:
-            card = QFrame()
-            card.setObjectName(theme.EVENT_CARD)
-            lay = QVBoxLayout(card)
-            lay.setContentsMargins(16, 12, 16, 12)
-            lay.setSpacing(4)
-
-            title = QLabel(r["title"] or "Untitled event")
-            title.setObjectName(theme.EVENT_TITLE_LIST)
-            lay.addWidget(title)
-
-            org = QLabel(
-                f"by {r['org_name'] or 'Independent'}"
+            card = EventCard(
+                r, view_mode="list",
+                current_volunteer_id=self.userID,
+                bookmarked_ids=self._bookmarked_ids,
             )
-            org.setObjectName(theme.EVENT_ORG)
-            lay.addWidget(org)
-
-            meta = QLabel(
-                f"{format_event_when(r)} · match {score}%"
-            )
-            meta.setObjectName(theme.EVENT_META_VALUE)
-            meta.setWordWrap(True)
-            lay.addWidget(meta)
-
-            opp_clusters = self.db.getOpportunityClusters(
-                r["opportunityID"]
-            ) or []
-            if opp_clusters:
-                c = QLabel(" · ".join(opp_clusters))
-                c.setObjectName(theme.EVENT_META_VALUE)
-                c.setWordWrap(True)
-                lay.addWidget(c)
-
+            card.set_bookmark_callback(self._on_bookmark_toggled)
+            card.detailsRequested.connect(self._show_details)
+            card.rsvpRequested.connect(self._handle_rsvp)
             self.results_layout.insertWidget(
                 self.results_layout.count() - 1, card
+            )
+
+    # ── Card callbacks ────────────────────────────────────────────────
+    def _on_bookmark_toggled(self, opportunityID, is_bookmarked):
+        if not self.userID:
+            return
+        result = self.db.toggleBookmark(self.userID, opportunityID)
+        if result == "added":
+            self._bookmarked_ids.add(opportunityID)
+        elif result == "removed":
+            self._bookmarked_ids.discard(opportunityID)
+
+    def _show_details(self, card):
+        EventDetailsDialog(card, self).exec()
+
+    def _handle_rsvp(self, opportunityID):
+        if not self.userID:
+            return
+        result = self.db.registerForOpportunity(
+            self.userID, opportunityID
+        )
+        if result == "ok":
+            try:
+                row = self.db.getOpportunityByID(opportunityID)
+                title = row["title"] if row else "an event"
+                self.db.addNotification(
+                    self.userID,
+                    f"You signed up for {title}.",
+                    "rsvp", opportunityID,
+                )
+            except Exception:
+                pass
+            QMessageBox.information(
+                self, "Registered",
+                "You're signed up! Check your My Events tab.",
+            )
+        elif result == "duplicate":
+            QMessageBox.information(
+                self, "Already registered",
+                "You've already RSVP'd for this event.",
+            )
+        elif result == "full":
+            QMessageBox.warning(
+                self, "Event full",
+                "This event has reached capacity.",
+            )
+        else:
+            QMessageBox.warning(
+                self, "Error", "Could not complete RSVP."
             )
