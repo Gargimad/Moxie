@@ -28,6 +28,10 @@ from PyQt6.QtWidgets import (
     QGridLayout, QStackedWidget, QFileDialog, QDialog,
 )
 from Events.dateFormat import format_date, format_range, format_event_when
+from Events.careerClusters import (
+    CAREER_CLUSTERS, legacy_category_to_cluster,
+)
+from Events.gaLocations import GA_CITIES
 import Events.theme as theme
 from Events.eventCard import clear_thumbnail_cache
 from Events.moxieCharts import (
@@ -73,6 +77,7 @@ class OrgDashboard(QWidget):
         self.on_back_click = on_back_click
         self.org = None
         self.editing_id = None
+        self._original_category = None
         self._pending_thumbnail = None
 
         outer = QVBoxLayout(self)
@@ -546,9 +551,9 @@ class OrgDashboard(QWidget):
             name = " ".join(
                 x for x in [r["first_name"], r["last_name"]] if x
             ) or r["email"]
-            rows.append((name, f"{float(r['hours'] or 0):.1f}h"))
+            rows.append((name, float(r["hours"] or 0)))
         if not rows:
-            rows = [("No hours logged yet", "0h")]
+            rows = [("No hours logged yet", 0.0)]
         self._chart_leaderboard.set_data(rows)
     # ── 1. List ────────────────────────────────────────────────────
     def _build_list_page(self):
@@ -627,26 +632,61 @@ class OrgDashboard(QWidget):
     def _build_form_page(self):
         page = QWidget()
         outer = QVBoxLayout(page)
-        outer.setContentsMargins(40, 24, 40, 24)
-        outer.setSpacing(12)
+        outer.setContentsMargins(36, 24, 36, 20)
+        outer.setSpacing(16)
+
+        header = QWidget()
+        header.setMaximumWidth(1120)
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(4)
 
         self.form_title = QLabel("New Opportunity")
-        self.form_title.setObjectName(theme.SECTION_TITLE)
-        outer.addWidget(self.form_title)
+        self.form_title.setObjectName("OpportunityFormTitle")
+        header_layout.addWidget(self.form_title)
+
+        subtitle = QLabel(
+            "Create a welcoming opportunity and share the details "
+            "volunteers need."
+        )
+        subtitle.setObjectName("OpportunityFormSubtitle")
+        header_layout.addWidget(subtitle)
+
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.addStretch(1)
+        header_row.addWidget(header, 8)
+        header_row.addStretch(1)
+        outer.addLayout(header_row)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         scroll.setObjectName(theme.HOME_SCROLL)
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
 
         scroll_content = QWidget()
-        form = QGridLayout(scroll_content)
-        form.setContentsMargins(0, 0, 0, 0)
-        form.setHorizontalSpacing(14)
-        form.setVerticalSpacing(10)
+        content_layout = QHBoxLayout(scroll_content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.addStretch(1)
+
+        form_card = QFrame()
+        form_card.setObjectName("OpportunityFormCard")
+        form_card.setMaximumWidth(1120)
+        card_layout = QVBoxLayout(form_card)
+        card_layout.setContentsMargins(28, 24, 28, 28)
+        card_layout.setSpacing(0)
+        content_layout.addWidget(form_card, 8)
+        content_layout.addStretch(1)
 
         self.f_title = QLineEdit()
         self.f_title.setPlaceholderText("e.g. Saturday park cleanup")
+
+        self.f_category = QComboBox()
+        self.f_category.addItem("Select a category")
+        self.f_category.addItems(CAREER_CLUSTERS)
 
         self.f_description = QTextEdit()
         self.f_description.setPlaceholderText(
@@ -654,11 +694,21 @@ class OrgDashboard(QWidget):
         )
         self.f_description.setFixedHeight(90)
 
+        self.f_city = QComboBox()
+        self.f_city.setEditable(True)
+        self.f_city.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.f_city.addItem("")
+        self.f_city.addItems(GA_CITIES)
+        self.f_city.lineEdit().setPlaceholderText("Georgia city")
+
         self.f_location = QLineEdit()
-        self.f_location.setPlaceholderText("Where (free text)")
+        self.f_location.setPlaceholderText("Neighborhood or location name")
 
         self.f_address = QLineEdit()
         self.f_address.setPlaceholderText("Street address (optional)")
+
+        self.f_high_school = QLineEdit()
+        self.f_high_school.setPlaceholderText("School (optional)")
 
         self.f_remote = QCheckBox("Remote")
 
@@ -694,46 +744,220 @@ class OrgDashboard(QWidget):
         self.f_contact_email = QLineEdit()
         self.f_contact_email.setPlaceholderText("Contact email")
 
-        r = 0
-        form.addWidget(QLabel("Title *"), r, 0)
-        form.addWidget(self.f_title, r, 1, 1, 3); r += 1
+        self.f_website = QLineEdit()
+        self.f_website.setPlaceholderText("https:// (optional)")
 
-        form.addWidget(QLabel("Description"), r, 0)
-        form.addWidget(self.f_description, r, 1, 1, 3); r += 1
+        self.f_min_age = QSpinBox()
+        self.f_min_age.setRange(0, 120)
+        self.f_min_age.setSpecialValueText("No minimum")
 
-        form.addWidget(QLabel("Status"), r, 0)
-        form.addWidget(self.f_status, r, 1)
-        form.addWidget(QLabel("Capacity"), r, 2)
-        form.addWidget(self.f_capacity, r, 3); r += 1
+        self.f_max_age = QSpinBox()
+        self.f_max_age.setRange(0, 120)
+        self.f_max_age.setSpecialValueText("No maximum")
 
-        form.addWidget(QLabel("Location"), r, 0)
-        form.addWidget(self.f_location, r, 1)
-        form.addWidget(QLabel("Address"), r, 2)
-        form.addWidget(self.f_address, r, 3); r += 1
+        self.f_min_grade = QLineEdit()
+        self.f_min_grade.setPlaceholderText("e.g. 9th grade")
 
-        form.addWidget(QLabel("Start date"), r, 0)
-        form.addWidget(self.f_date, r, 1)
-        form.addWidget(QLabel("End date"), r, 2)
-        form.addWidget(self.f_end_date, r, 3); r += 1
+        self.f_max_grade = QLineEdit()
+        self.f_max_grade.setPlaceholderText("e.g. 12th grade")
 
-        form.addWidget(self.f_remote, r, 0)
-        form.addWidget(QLabel("Start time"), r, 2)
-        form.addWidget(self.f_start, r, 3); r += 1
+        self.f_meeting_point = QLineEdit()
+        self.f_meeting_point.setPlaceholderText("Where to check in")
 
-        form.addWidget(QLabel("End time"), r, 0)
-        form.addWidget(self.f_end, r, 1)
-        r += 1
+        self.f_parking = QLineEdit()
+        self.f_parking.setPlaceholderText("Parking details (optional)")
 
-        form.addWidget(QLabel("Required skills"), r, 0)
-        form.addWidget(self.f_skills, r, 1, 1, 3); r += 1
+        self.f_accessibility = QTextEdit()
+        self.f_accessibility.setPlaceholderText(
+            "Accessibility accommodations or site details (optional)"
+        )
+        self.f_accessibility.setFixedHeight(72)
 
-        form.addWidget(QLabel("Contact name"), r, 0)
-        form.addWidget(self.f_contact_name, r, 1)
-        form.addWidget(QLabel("Contact email"), r, 2)
-        form.addWidget(self.f_contact_email, r, 3); r += 1
+        self.f_what_to_bring = QLineEdit()
+        self.f_what_to_bring.setPlaceholderText(
+            "e.g. Water bottle, work gloves"
+        )
+
+        self.f_dress_code = QLineEdit()
+        self.f_dress_code.setPlaceholderText(
+            "e.g. Closed-toe shoes, comfortable clothes"
+        )
+
+        self.f_meal_provided = QCheckBox("A meal will be provided")
+        self.f_background_check = QCheckBox(
+            "Background check required"
+        )
+        self.f_training_required = QCheckBox("Training required")
+
+        self.f_training_description = QTextEdit()
+        self.f_training_description.setPlaceholderText(
+            "Training details (optional)"
+        )
+        self.f_training_description.setFixedHeight(72)
+
+        def add_section(title, hint):
+            section = QWidget()
+            section_layout = QVBoxLayout(section)
+            section_layout.setContentsMargins(0, 0, 0, 0)
+            section_layout.setSpacing(12)
+
+            heading = QLabel(title)
+            heading.setObjectName("OpportunityFormSectionTitle")
+            section_layout.addWidget(heading)
+
+            if hint:
+                description = QLabel(hint)
+                description.setObjectName("OpportunityFormSectionHint")
+                description.setWordWrap(True)
+                section_layout.addWidget(description)
+
+            card_layout.addWidget(section)
+            return section_layout
+
+        def add_field(grid, label_text, widget, row, column, span=1):
+            field = QWidget()
+            field_layout = QVBoxLayout(field)
+            field_layout.setContentsMargins(0, 0, 0, 0)
+            field_layout.setSpacing(6)
+
+            label = QLabel(label_text)
+            label.setObjectName("OpportunityFormLabel")
+            field_layout.addWidget(label)
+            field_layout.addWidget(widget)
+            grid.addWidget(field, row, column, 1, span)
+
+        def add_divider():
+            divider = QFrame()
+            divider.setObjectName("OpportunityFormDivider")
+            divider.setFrameShape(QFrame.Shape.HLine)
+            card_layout.addWidget(divider)
+            card_layout.addSpacing(20)
+
+        basics = add_section(
+            "Opportunity details",
+            "Give your opportunity a clear title and a short description.",
+        )
+        basics_grid = QGridLayout()
+        basics_grid.setContentsMargins(0, 0, 0, 0)
+        basics_grid.setHorizontalSpacing(20)
+        basics_grid.setVerticalSpacing(16)
+        add_field(basics_grid, "Title *", self.f_title, 0, 0)
+        add_field(basics_grid, "Category *", self.f_category, 0, 1)
+        add_field(basics_grid, "Description", self.f_description, 1, 0, 2)
+        basics_grid.setColumnStretch(0, 1)
+        basics_grid.setColumnStretch(1, 1)
+        basics.addLayout(basics_grid)
+        add_divider()
+
+        logistics = add_section(
+            "Time & location",
+            "Let volunteers know when and where to meet.",
+        )
+        logistics_grid = QGridLayout()
+        logistics_grid.setContentsMargins(0, 0, 0, 0)
+        logistics_grid.setHorizontalSpacing(20)
+        logistics_grid.setVerticalSpacing(16)
+        add_field(logistics_grid, "Georgia city", self.f_city, 0, 0)
+        add_field(logistics_grid, "Neighborhood or location",
+                  self.f_location, 0, 1)
+        add_field(logistics_grid, "Street address (optional)",
+                  self.f_address, 1, 0, 2)
+        add_field(logistics_grid, "Start date", self.f_date, 2, 0)
+        add_field(logistics_grid, "End date", self.f_end_date, 2, 1)
+        add_field(logistics_grid, "Start time", self.f_start, 3, 0)
+        add_field(logistics_grid, "End time", self.f_end, 3, 1)
+        add_field(logistics_grid, "School (optional)",
+                  self.f_high_school, 4, 0, 2)
+        logistics_grid.setColumnStretch(0, 1)
+        logistics_grid.setColumnStretch(1, 1)
+        logistics.addLayout(logistics_grid)
+        logistics.addWidget(self.f_remote)
+        add_divider()
+
+        volunteers = add_section(
+            "Volunteer details",
+            "Set expectations and let volunteers know what to bring.",
+        )
+        volunteer_grid = QGridLayout()
+        volunteer_grid.setContentsMargins(0, 0, 0, 0)
+        volunteer_grid.setHorizontalSpacing(20)
+        volunteer_grid.setVerticalSpacing(16)
+        add_field(volunteer_grid, "Signup status", self.f_status, 0, 0)
+        add_field(volunteer_grid, "Volunteer capacity",
+                  self.f_capacity, 0, 1)
+        add_field(volunteer_grid, "Required skills (optional)",
+                  self.f_skills, 1, 0, 2)
+        volunteer_grid.setColumnStretch(0, 1)
+        volunteer_grid.setColumnStretch(1, 1)
+        volunteers.addLayout(volunteer_grid)
+        add_divider()
+
+        eligibility = add_section(
+            "Eligibility & requirements",
+            "Optional age or grade limits help volunteers find the right fit.",
+        )
+        eligibility_grid = QGridLayout()
+        eligibility_grid.setContentsMargins(0, 0, 0, 0)
+        eligibility_grid.setHorizontalSpacing(20)
+        eligibility_grid.setVerticalSpacing(16)
+        add_field(eligibility_grid, "Minimum age", self.f_min_age, 0, 0)
+        add_field(eligibility_grid, "Maximum age", self.f_max_age, 0, 1)
+        add_field(eligibility_grid, "Minimum grade",
+                  self.f_min_grade, 1, 0)
+        add_field(eligibility_grid, "Maximum grade",
+                  self.f_max_grade, 1, 1)
+        eligibility_grid.setColumnStretch(0, 1)
+        eligibility_grid.setColumnStretch(1, 1)
+        eligibility.addLayout(eligibility_grid)
+        eligibility.addWidget(self.f_background_check)
+        eligibility.addWidget(self.f_training_required)
+        training_grid = QGridLayout()
+        training_grid.setContentsMargins(0, 0, 0, 0)
+        add_field(training_grid, "Training details (optional)",
+                  self.f_training_description, 0, 0, 2)
+        eligibility.addLayout(training_grid)
+        add_divider()
+
+        onsite = add_section(
+            "On-site details",
+            "Share practical information so volunteers can prepare.",
+        )
+        onsite_grid = QGridLayout()
+        onsite_grid.setContentsMargins(0, 0, 0, 0)
+        onsite_grid.setHorizontalSpacing(20)
+        onsite_grid.setVerticalSpacing(16)
+        add_field(onsite_grid, "Meeting point", self.f_meeting_point, 0, 0)
+        add_field(onsite_grid, "Parking", self.f_parking, 0, 1)
+        add_field(onsite_grid, "What to bring", self.f_what_to_bring, 1, 0)
+        add_field(onsite_grid, "Dress code", self.f_dress_code, 1, 1)
+        add_field(onsite_grid, "Accessibility notes",
+                  self.f_accessibility, 2, 0, 2)
+        onsite_grid.setColumnStretch(0, 1)
+        onsite_grid.setColumnStretch(1, 1)
+        onsite.addLayout(onsite_grid)
+        onsite.addWidget(self.f_meal_provided)
+        add_divider()
+
+        contact = add_section(
+            "Contact & image",
+            "Provide a point of contact and an optional opportunity image.",
+        )
+        contact_grid = QGridLayout()
+        contact_grid.setContentsMargins(0, 0, 0, 0)
+        contact_grid.setHorizontalSpacing(20)
+        contact_grid.setVerticalSpacing(16)
+        add_field(contact_grid, "Contact name (optional)",
+                  self.f_contact_name, 0, 0)
+        add_field(contact_grid, "Contact email (optional)",
+                  self.f_contact_email, 0, 1)
+        add_field(contact_grid, "Website (optional)",
+                  self.f_website, 1, 0, 2)
+        contact_grid.setColumnStretch(0, 1)
+        contact_grid.setColumnStretch(1, 1)
+        contact.addLayout(contact_grid)
 
         self.thumb_lbl = QLabel("No image attached")
-        self.thumb_lbl.setObjectName(theme.EVENT_META_VALUE)
+        self.thumb_lbl.setObjectName("OpportunityFormImageStatus")
 
         pick_btn = QPushButton("Choose image…")
         pick_btn.setObjectName(theme.SECONDARY_BTN)
@@ -746,17 +970,27 @@ class OrgDashboard(QWidget):
         clear_btn.clicked.connect(self._clear_thumbnail)
 
         thumb_row = QHBoxLayout()
+        thumb_row.setContentsMargins(0, 0, 0, 0)
+        thumb_row.setSpacing(8)
         thumb_row.addWidget(pick_btn)
         thumb_row.addWidget(clear_btn)
         thumb_row.addWidget(self.thumb_lbl, 1)
 
-        form.addWidget(QLabel("Thumbnail"), r, 0)
-        form.addLayout(thumb_row, r, 1, 1, 4); r += 1
+        thumbnail_label = QLabel("Opportunity thumbnail (optional)")
+        thumbnail_label.setObjectName("OpportunityFormLabel")
+        contact.addWidget(thumbnail_label)
+        contact.addLayout(thumb_row)
 
         scroll.setWidget(scroll_content)
         outer.addWidget(scroll, 1)
 
+        footer_divider = QFrame()
+        footer_divider.setObjectName("OpportunityFormDivider")
+        footer_divider.setFrameShape(QFrame.Shape.HLine)
+        outer.addWidget(footer_divider)
+
         row = QHBoxLayout()
+        row.setContentsMargins(0, 8, 0, 0)
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setObjectName(theme.SECONDARY_BTN)
         cancel_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -765,6 +999,7 @@ class OrgDashboard(QWidget):
         save_btn = QPushButton("Save")
         save_btn.setObjectName(theme.PRIMARY_BTN)
         save_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        save_btn.setMinimumWidth(112)
         save_btn.clicked.connect(self._save)
 
         row.addStretch()
@@ -775,20 +1010,33 @@ class OrgDashboard(QWidget):
 
     def _start_new(self):
         self.editing_id = None
+        self._original_category = None
         self._pending_thumbnail = None
         self.form_title.setText("New Opportunity")
         for w in (self.f_title, self.f_description, self.f_location,
                   self.f_address, self.f_skills, self.f_contact_name,
-                  self.f_contact_email, self.f_start, self.f_end):
+                  self.f_contact_email, self.f_start, self.f_end,
+                  self.f_high_school, self.f_website, self.f_min_grade,
+                  self.f_max_grade, self.f_meeting_point, self.f_parking,
+                  self.f_accessibility, self.f_what_to_bring,
+                  self.f_dress_code, self.f_training_description):
             try:
                 w.clear()
             except Exception:
                 pass
+        self.f_category.setCurrentIndex(0)
+        self.f_city.setCurrentIndex(0)
+        self.f_city.lineEdit().clear()
         self.f_remote.setChecked(False)
         self.f_date.setDate(QDate.currentDate())
         self.f_end_date.setDate(QDate.currentDate())
         self.f_capacity.setValue(0)
+        self.f_min_age.setValue(0)
+        self.f_max_age.setValue(0)
         self.f_status.setCurrentText("open")
+        self.f_meal_provided.setChecked(False)
+        self.f_background_check.setChecked(False)
+        self.f_training_required.setChecked(False)
         self.thumb_lbl.setText("No image attached")
         self.show_tab(TAB_FORM)
 
@@ -810,9 +1058,20 @@ class OrgDashboard(QWidget):
         self._pending_thumbnail = row["thumbnail"]
         self.form_title.setText("Edit Opportunity")
         self.f_title.setText(row["title"] or "")
+        category = legacy_category_to_cluster(row["category"])
+        if not category:
+            category = row["category"] or ""
+        self._original_category = category
+        category_index = self.f_category.findText(category)
+        if category and category_index < 0:
+            self.f_category.addItem(category)
+            category_index = self.f_category.count() - 1
+        self.f_category.setCurrentIndex(max(0, category_index))
         self.f_description.setPlainText(row["description"] or "")
         self.f_location.setText(row["location"] or "")
         self.f_address.setText(row["address"] or "")
+        self.f_city.setCurrentText(row["city"] or "")
+        self.f_high_school.setText(row["high_school"] or "")
         self.f_remote.setChecked(bool(row["is_remote"]))
         if row["event_date"]:
             d = QDate.fromString(str(row["event_date"])[:10],
@@ -831,8 +1090,30 @@ class OrgDashboard(QWidget):
         self.f_capacity.setValue(row["capacity"] or 0)
         self.f_status.setCurrentText(row["status"] or "open")
         self.f_skills.setText(row["required_skills"] or "")
+        self.f_min_age.setValue(row["min_age"] or 0)
+        self.f_max_age.setValue(row["max_age"] or 0)
+        self.f_min_grade.setText(row["min_grade"] or "")
+        self.f_max_grade.setText(row["max_grade"] or "")
+        self.f_meeting_point.setText(row["meeting_point"] or "")
+        self.f_parking.setText(row["parking_info"] or "")
+        self.f_accessibility.setPlainText(
+            row["accessibility_notes"] or ""
+        )
+        self.f_what_to_bring.setText(row["what_to_bring"] or "")
+        self.f_dress_code.setText(row["dress_code"] or "")
+        self.f_meal_provided.setChecked(bool(row["meal_provided"]))
+        self.f_background_check.setChecked(
+            bool(row["background_check_required"])
+        )
+        self.f_training_required.setChecked(
+            bool(row["training_required"])
+        )
+        self.f_training_description.setPlainText(
+            row["training_description"] or ""
+        )
         self.f_contact_name.setText(row["contact_name"] or "")
         self.f_contact_email.setText(row["contact_email"] or "")
+        self.f_website.setText(row["website_link"] or "")
         self.thumb_lbl.setText(
             self._pending_thumbnail or "No image attached"
         )
@@ -1007,12 +1288,29 @@ class OrgDashboard(QWidget):
                                 "Title is required.")
             return
 
+        category = self.f_category.currentText().strip()
+        if self.f_category.currentIndex() <= 0 or not category:
+            QMessageBox.warning(
+                self, "Missing category",
+                "Choose a category for this opportunity.",
+            )
+            return
+
         start_date = self.f_date.date()
         end_date = self.f_end_date.date()
         if end_date < start_date:
             QMessageBox.warning(
                 self, "Invalid dates",
                 "End date can't be before the start date."
+            )
+            return
+
+        min_age = self.f_min_age.value() or None
+        max_age = self.f_max_age.value() or None
+        if min_age and max_age and max_age < min_age:
+            QMessageBox.warning(
+                self, "Invalid age range",
+                "Maximum age can't be lower than minimum age.",
             )
             return
 
@@ -1023,9 +1321,13 @@ class OrgDashboard(QWidget):
         payload = dict(
             title=title,
             description=self.f_description.toPlainText().strip(),
+            category=category,
             location=self.f_location.text().strip(),
             address=self.f_address.text().strip(),
             is_remote=self.f_remote.isChecked(),
+            city=self.f_city.currentText().strip() or None,
+            state="GA",
+            high_school=self.f_high_school.text().strip() or None,
             event_date=start_iso,
             event_end_date=stored_end,
             start_time=self.f_start.text().strip() or None,
@@ -1033,9 +1335,33 @@ class OrgDashboard(QWidget):
             capacity=self.f_capacity.value() or None,
             status=self.f_status.currentText(),
             required_skills=self.f_skills.text().strip() or None,
+            min_age=min_age,
+            max_age=max_age,
+            min_grade=self.f_min_grade.text().strip() or None,
+            max_grade=self.f_max_grade.text().strip() or None,
+            meeting_point=self.f_meeting_point.text().strip() or None,
+            parking_info=self.f_parking.text().strip() or None,
+            accessibility_notes=(
+                self.f_accessibility.toPlainText().strip() or None
+            ),
+            what_to_bring=self.f_what_to_bring.text().strip() or None,
+            dress_code=self.f_dress_code.text().strip() or None,
+            meal_provided=self.f_meal_provided.isChecked(),
+            background_check_required=(
+                self.f_background_check.isChecked()
+            ),
+            training_required=self.f_training_required.isChecked(),
+            training_description=(
+                self.f_training_description.toPlainText().strip() or None
+            ),
             contact_name=self.f_contact_name.text().strip() or None,
             contact_email=self.f_contact_email.text().strip() or None,
+            website_link=self.f_website.text().strip() or None,
             thumbnail=self._pending_thumbnail,
+        )
+        category_cluster = (
+            legacy_category_to_cluster(category)
+            or (category if category in CAREER_CLUSTERS else None)
         )
 
         if self.editing_id:
@@ -1044,6 +1370,7 @@ class OrgDashboard(QWidget):
                 QMessageBox.warning(self, "Save failed",
                                     "Could not update opportunity.")
                 return
+            opportunity_id = self.editing_id
         else:
             new_id = self.db.addOpportunity(
                 orgID=self.org["orgID"],
@@ -1053,12 +1380,30 @@ class OrgDashboard(QWidget):
                 QMessageBox.warning(self, "Save failed",
                                     "Could not create opportunity.")
                 return
+            opportunity_id = new_id
             # Notify matching volunteers (best-effort).
             try:
                 n = self.db.notifyVolunteersAboutOpportunity(new_id)
                 print(f"[org] notified {n} matching volunteers")
             except Exception as e:
                 print("notifyVolunteersAboutOpportunity failed:", e)
+
+        category_changed = (
+            self.editing_id is None
+            or category != self._original_category
+        )
+        if (
+            category_cluster and category_changed
+            and not self.db.setOpportunityClusters(
+                opportunity_id, [category_cluster]
+            )
+        ):
+            QMessageBox.warning(
+                self, "Category update incomplete",
+                "The opportunity was saved, but its category could not be "
+                "applied to volunteer matching. Please edit and save it "
+                "again, or contact support.",
+            )
 
         clear_thumbnail_cache()
         self._refresh_list()

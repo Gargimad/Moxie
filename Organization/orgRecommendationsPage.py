@@ -258,23 +258,52 @@ class OrgRecommendationsPage(QWidget):
         return row
 
     def _invite(self, volunteer, opportunity):
+        if not self.org:
+            QMessageBox.warning(
+                self, "Invite failed",
+                "Select an organization before sending an invitation.",
+            )
+            return
+
         uid = volunteer["userID"]
         oid = opportunity["opportunityID"]
-        title = opportunity["title"] or "an event"
-        try:
-            self.db.addNotification(
-                uid,
-                f"You're invited to sign up for {title} "
-                f"(matched to your career interests).",
-                "opportunity_invite",
-                oid,
-            )
+        result = self.db.createOpportunityInvitation(
+            self.org["orgID"], uid, oid
+        )
+        if result == "sent":
             QMessageBox.information(
                 self, "Invitation sent",
-                f"Sent an in-app invite to "
+                f"Sent an invitation to "
                 f"{volunteer.get('email', 'the volunteer')}.",
             )
-        except Exception as e:
+        elif result in ("pending", "accepted"):
+            QMessageBox.information(
+                self, "Invitation already sent",
+                "This volunteer already has an invitation for this "
+                "opportunity.",
+            )
+        elif result == "already_registered":
+            QMessageBox.information(
+                self, "Already signed up",
+                "This volunteer is already signed up for the opportunity.",
+            )
+        elif result == "full":
             QMessageBox.warning(
-                self, "Invite failed", f"Could not send invite:\n{e}"
+                self, "Opportunity full",
+                "There are no spots left for this opportunity.",
+            )
+        elif result == "unavailable":
+            QMessageBox.warning(
+                self, "Opportunity unavailable",
+                "This opportunity is no longer open.",
+            )
+        elif result == "invalid_volunteer":
+            QMessageBox.warning(
+                self, "Invite failed",
+                "The selected account is not an active volunteer account.",
+            )
+        else:
+            QMessageBox.warning(
+                self, "Invite failed",
+                "Could not send this invitation. Please try again.",
             )

@@ -114,6 +114,7 @@ class Landing(QMainWindow):
         self._build_ui()
         self.global_mic = GlobalMicButton(self)
         self.global_mic.reposition()
+        self.global_mic.setVisible(False)
         self._wire_signals()
         self._set_nav_mode(NAV_GUEST)
 
@@ -172,10 +173,13 @@ class Landing(QMainWindow):
         self.navTabsLayout.setSpacing(4)
 
         self.btnThemeToggle = QPushButton(
-            "🌙" if not self.is_dark_mode else "☀"
+            "\u263E\uFE0E" if not self.is_dark_mode else "\u2600\uFE0E"
         )
         self.btnThemeToggle.setObjectName(theme.NAV_GROUP_BTN)
-        self.btnThemeToggle.setToolTip("Toggle dark / light mode")
+        self.btnThemeToggle.setToolTip(
+            "Switch to dark mode" if not self.is_dark_mode
+            else "Switch to light mode"
+        )
         self.btnThemeToggle.setCursor(
             QCursor(Qt.CursorShape.PointingHandCursor)
         )
@@ -605,7 +609,13 @@ class Landing(QMainWindow):
             "theme", "dark" if self.is_dark_mode else "light"
         )
         theme.apply_theme(self._app(), self.is_dark_mode)
-        self.btnThemeToggle.setText("☀" if self.is_dark_mode else "🌙")
+        self.btnThemeToggle.setText(
+            "\u2600\uFE0E" if self.is_dark_mode else "\u263E\uFE0E"
+        )
+        self.btnThemeToggle.setToolTip(
+            "Switch to light mode" if self.is_dark_mode
+            else "Switch to dark mode"
+        )
         self._update_logos()
 
     def _update_logos(self):

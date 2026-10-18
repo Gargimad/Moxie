@@ -24,6 +24,7 @@ import Events.theme as theme
 from Events.careerClusters import CAREER_CLUSTERS
 from Events.gaLocations import GA_CITIES, ALL_CITIES
 from Events.multiSelectCauses import MultiSelectCauses
+from Guest.micAttachment import attach_mic_to_line_edit
 
 MAX_RECENTS = 6
 
@@ -78,12 +79,11 @@ class SearchBar(QWidget):
         # ── Keyword ───────────────────────────────────────────────────
         self.searchInput = QLineEdit()
         self.searchInput.setObjectName(theme.searchInput)
-        self.searchInput.setPlaceholderText(
-            "Search organizations, opportunities, or events..."
-        )
+        self.searchInput.setPlaceholderText("Search organizations, opportunities, or events...")
         self.searchInput.setClearButtonEnabled(False)
         self.searchInput.returnPressed.connect(self._emit_search)
         self.searchInput.textChanged.connect(self._on_text_changed)
+        attach_mic_to_line_edit(self.searchInput)
 
         icon_path = theme.asset("search.svg")
         if os.path.exists(icon_path):
@@ -115,11 +115,11 @@ class SearchBar(QWidget):
         )
         self.searchBtn.clicked.connect(self._emit_search)
 
+        layout.addWidget(self.searchInput, 1)
         layout.addWidget(self.causes_multi)
         layout.addWidget(self.typeCombo)
         layout.addWidget(self.cityCombo)
         layout.addWidget(self.zipcodeInput)
-        layout.addWidget(self.searchInput, 1)
         layout.addWidget(self.searchBtn)
 
         # ── Recent-searches popup ─────────────────────────────────────

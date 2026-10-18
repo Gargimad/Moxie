@@ -22,17 +22,20 @@ class VoiceWorker(QThread):
         """Capture one utterance from the mic and transcribe it."""
         self._running = True
 
-        # Use the default microphone
-        with sr.Microphone() as source:
-            self.recognizer.pause_threshold = 0.6
-            self.recognizer.adjust_for_ambient_noise(source, duration=0.25)
-
-            try:
+        try:
+            with sr.Microphone() as source:
+                self.recognizer.pause_threshold = 0.6
+                self.recognizer.adjust_for_ambient_noise(
+                    source, duration=0.25
+                )
                 # Listen for speech (blocks until the user stops talking)
                 audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=10)
-            except sr.WaitTimeoutError:
-                self.failed.emit("No speech detected. Try again.")
-                return
+        except sr.WaitTimeoutError:
+            self.failed.emit("No speech detected. Try again.")
+            return
+        except (OSError, AttributeError) as e:
+            self.failed.emit(f"Microphone unavailable: {e}")
+            return
 
         try:
             # Google's free recognition service (no API key needed)

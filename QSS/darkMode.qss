@@ -1604,6 +1604,64 @@ QPushButton#HeroLearnBtn:pressed {
     border-top: 4px solid #7B8BE0;
 }
 
+/* ── Organization Opportunity Form ─────────────────────────────── */
+QFrame#OpportunityFormCard {
+    background-color: #2E2238;
+    border: 1px solid #4A3A54;
+}
+
+QLabel#OpportunityFormTitle {
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-size: 30px;
+    font-weight: 700;
+    color: #EDE6F2;
+}
+
+QLabel#OpportunityFormSubtitle,
+QLabel#OpportunityFormSectionHint {
+    color: #9C8EA9;
+    font-size: 14px;
+}
+
+QLabel#OpportunityFormSectionTitle {
+    color: #EDE6F2;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+QLabel#OpportunityFormLabel {
+    color: #C7B9D4;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+QLabel#OpportunityFormImageStatus {
+    color: #9C8EA9;
+    font-size: 13px;
+}
+
+QFrame#OpportunityFormDivider {
+    background-color: #4A3A54;
+    border: none;
+    max-height: 1px;
+}
+
+#OpportunityFormCard QTextEdit {
+    background-color: #251A2E;
+    border: 1px solid #4A3A54;
+    padding: 11px 14px;
+    font-size: 14px;
+    color: #EDE6F2;
+    selection-background-color: #B39CDB;
+    selection-color: #1E1626;
+}
+
+#OpportunityFormCard QTextEdit:focus {
+    border: 2px solid #7B8BE0;
+    padding: 10px 13px;
+    background-color: #352543;
+}
+
 #MoxieHeroAction {
     background-color: #B39CDB;
     color: #1E1626;

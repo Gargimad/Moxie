@@ -314,6 +314,26 @@ class Database:
         """)
 
         self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS opportunity_invitations (
+                invitationID INTEGER PRIMARY KEY AUTOINCREMENT,
+                orgID INTEGER NOT NULL,
+                userID INTEGER NOT NULL,
+                opportunityID INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending', 'accepted', 'declined')),
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                responded_at TEXT,
+                FOREIGN KEY(orgID) REFERENCES organizations(orgID)
+                    ON DELETE CASCADE,
+                FOREIGN KEY(userID) REFERENCES users(userID)
+                    ON DELETE CASCADE,
+                FOREIGN KEY(opportunityID)
+                    REFERENCES opportunities(opportunityID)
+                    ON DELETE CASCADE
+            );
+        """)
+
+        self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_org_colors (
                 userID INTEGER NOT NULL,
                 orgID INTEGER NOT NULL,
@@ -491,6 +511,10 @@ class Database:
     def migrate(self):
         added = []
 
+        added += self._add_columns(
+            "notifications",
+            {"invitationID": "INTEGER"},
+        )
         added += self._add_columns(
             "event_signups",
             {
@@ -2027,10 +2051,206 @@ class Database:
 
     def getNotifications(self, userID, limit=50):
         self.cursor.execute("""
-            SELECT * FROM notifications WHERE userID = ?
-            ORDER BY created_at DESC LIMIT ?
+            SELECT n.*,
+                   i.status AS invitation_status,
+                   i.invitationID AS linked_invitationID
+            FROM notifications n
+            LEFT JOIN opportunity_invitations i
+                ON i.invitationID = n.invitationID
+            WHERE n.userID = ?
+            ORDER BY n.created_at DESC, n.notificationID DESC LIMIT ?
         """, (userID, limit))
         return self.cursor.fetchall()
+
+    def createOpportunityInvitation(self, orgID, userID, opportunityID):
+        try:
+            self.connection.execute("BEGIN IMMEDIATE")
+            self.cursor.execute(
+                "SELECT o.title, o.capacity, org.org_name "
+                "FROM opportunities o "
+                "JOIN organizations org ON org.orgID = o.orgID "
+                "WHERE o.opportunityID = ? AND o.orgID = ? "
+                "AND COALESCE(o.status, 'open') = 'open'",
+                (opportunityID, orgID),
+            )
+            opportunity = self.cursor.fetchone()
+            if not opportunity:
+                self.connection.rollback()
+                return "unavailable"
+
+            self.cursor.execute(
+                "SELECT 1 FROM users "
+                "WHERE userID = ? AND role = 'volunteer'",
+                (userID,),
+            )
+            if not self.cursor.fetchone():
+                self.connection.rollback()
+                return "invalid_volunteer"
+
+            self.cursor.execute(
+                "SELECT status FROM event_signups "
+                "WHERE userID = ? AND opportunityID = ?",
+                (userID, opportunityID),
+            )
+            signup = self.cursor.fetchone()
+            if signup and signup["status"] == "registered":
+                self.connection.rollback()
+                return "already_registered"
+            if opportunity["capacity"] is not None:
+                self.cursor.execute("""
+                    SELECT COUNT(*) AS registered_count
+                    FROM event_signups
+                    WHERE opportunityID = ? AND status = 'registered'
+                """, (opportunityID,))
+                if (self.cursor.fetchone()["registered_count"]
+                        >= opportunity["capacity"]):
+                    self.connection.rollback()
+                    return "full"
+
+            self.cursor.execute("""
+                SELECT invitationID, status
+                FROM opportunity_invitations
+                WHERE orgID = ? AND userID = ? AND opportunityID = ?
+                ORDER BY invitationID DESC LIMIT 1
+            """, (orgID, userID, opportunityID))
+            invitation = self.cursor.fetchone()
+            if invitation and invitation["status"] == "pending":
+                self.connection.rollback()
+                return "pending"
+
+            self.cursor.execute("""
+                INSERT INTO opportunity_invitations
+                    (orgID, userID, opportunityID)
+                VALUES (?, ?, ?)
+            """, (orgID, userID, opportunityID))
+            invitationID = self.cursor.lastrowid
+
+            self.cursor.execute("""
+                INSERT INTO notifications
+                    (userID, message, type, related_opportunityID,
+                     invitationID)
+                VALUES (?, ?, 'opportunity_invite', ?, ?)
+            """, (
+                userID,
+                f"{opportunity['org_name']} invited you to "
+                f"{opportunity['title'] or 'an opportunity'}.",
+                opportunityID,
+                invitationID,
+            ))
+            self.connection.commit()
+            return "sent"
+        except sqlite3.Error as e:
+            self.connection.rollback()
+            print("createOpportunityInvitation error:", e)
+            return "error"
+
+    def respondToOpportunityInvitation(self, userID, invitationID,
+                                       accept):
+        try:
+            self.connection.execute("BEGIN IMMEDIATE")
+            self.cursor.execute("""
+                SELECT i.status, i.opportunityID, o.capacity,
+                       COALESCE(o.status, 'open') AS opportunity_status
+                FROM opportunity_invitations i
+                JOIN opportunities o
+                    ON o.opportunityID = i.opportunityID
+                WHERE i.invitationID = ? AND i.userID = ?
+            """, (invitationID, userID))
+            invitation = self.cursor.fetchone()
+            if not invitation:
+                self.connection.rollback()
+                return "not_found"
+            if invitation["status"] != "pending":
+                self.connection.rollback()
+                return invitation["status"]
+
+            if not accept:
+                self.cursor.execute("""
+                    UPDATE opportunity_invitations
+                    SET status = 'declined',
+                        responded_at = CURRENT_TIMESTAMP
+                    WHERE invitationID = ? AND status = 'pending'
+                """, (invitationID,))
+                self.cursor.execute("""
+                    UPDATE notifications SET read_at = CURRENT_TIMESTAMP
+                    WHERE invitationID = ?
+                """, (invitationID,))
+                self.connection.commit()
+                return "declined"
+
+            if invitation["opportunity_status"] != "open":
+                self.connection.rollback()
+                return "unavailable"
+
+            opportunityID = invitation["opportunityID"]
+            self.cursor.execute("""
+                SELECT status FROM event_signups
+                WHERE userID = ? AND opportunityID = ?
+            """, (userID, opportunityID))
+            signup = self.cursor.fetchone()
+            if signup and signup["status"] == "registered":
+                self.cursor.execute("""
+                    UPDATE opportunity_invitations
+                    SET status = 'accepted',
+                        responded_at = CURRENT_TIMESTAMP
+                    WHERE invitationID = ?
+                """, (invitationID,))
+                self.cursor.execute("""
+                    UPDATE notifications SET read_at = CURRENT_TIMESTAMP
+                    WHERE invitationID = ?
+                """, (invitationID,))
+                self.connection.commit()
+                return "already_registered"
+
+            if invitation["capacity"] is not None:
+                self.cursor.execute("""
+                    SELECT COUNT(*) AS registered_count
+                    FROM event_signups
+                    WHERE opportunityID = ? AND status = 'registered'
+                """, (opportunityID,))
+                if (self.cursor.fetchone()["registered_count"]
+                        >= invitation["capacity"]):
+                    self.connection.rollback()
+                    return "full"
+
+            if signup:
+                self.cursor.execute("""
+                    UPDATE event_signups
+                    SET status = 'registered',
+                        signup_time = CURRENT_TIMESTAMP,
+                        check_in_time = NULL,
+                        check_out_time = NULL,
+                        hours_logged = 0,
+                        verified = 0,
+                        verified_by = NULL,
+                        verified_at = NULL,
+                        no_show = 0,
+                        reminder_sent = 0
+                    WHERE userID = ? AND opportunityID = ?
+                """, (userID, opportunityID))
+            else:
+                self.cursor.execute("""
+                    INSERT INTO event_signups
+                        (userID, opportunityID, status)
+                    VALUES (?, ?, 'registered')
+                """, (userID, opportunityID))
+
+            self.cursor.execute("""
+                UPDATE opportunity_invitations
+                SET status = 'accepted',
+                    responded_at = CURRENT_TIMESTAMP
+                WHERE invitationID = ? AND status = 'pending'
+            """, (invitationID,))
+            self.cursor.execute("""
+                UPDATE notifications SET read_at = CURRENT_TIMESTAMP
+                WHERE invitationID = ?
+            """, (invitationID,))
+            self.connection.commit()
+            return "accepted"
+        except sqlite3.Error as e:
+            self.connection.rollback()
+            print("respondToOpportunityInvitation error:", e)
+            return "error"
 
     def markNotificationRead(self, notificationID):
         self.cursor.execute("""

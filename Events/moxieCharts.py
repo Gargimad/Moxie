@@ -148,7 +148,7 @@ class HBarChart(QWidget):
             p.drawText(
                 QRectF(label_w + bar_w + 6, y, value_w, self._row_h - 6),
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-                str(value),
+                f"{value:.1f}h",
             )
             y += self._row_h
         p.end()

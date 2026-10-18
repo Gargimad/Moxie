@@ -4,7 +4,6 @@ from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QStackedWidget, QGridLayout, QButtonGroup, QMessageBox,
-    QFrame,
 )
 
 import Events.theme as theme
@@ -28,6 +27,7 @@ class VolunteerPage(QWidget):
         self._bookmarked_ids = set()
         self._grid_cards = []
         self._grid_cols = 0
+        self._recommendation_cards = []
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -115,13 +115,39 @@ class VolunteerPage(QWidget):
 
     # ── Scroll container ──────────────────────────────────────────────
     def _build_scroll(self):
-        self.scroll = QScrollArea()
-        self.scroll.setObjectName(theme.VOLUNTEER_SCROLL)
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setHorizontalScrollBarPolicy(
+        self.results_scroll = QScrollArea()
+        self.results_scroll.setObjectName(theme.VOLUNTEER_SCROLL)
+        self.results_scroll.setWidgetResizable(True)
+        self.results_scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
-        self.scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.results_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+
+        self.scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(self.scroll_content)
+        scroll_layout.setContentsMargins(24, 8, 24, 30)
+        scroll_layout.setSpacing(14)
+
+        self.recommendations_section = QWidget()
+        recommendation_layout = QVBoxLayout(
+            self.recommendations_section
+        )
+        recommendation_layout.setContentsMargins(0, 0, 0, 0)
+        recommendation_layout.setSpacing(10)
+
+        recommendation_title = QLabel("Recommended for you")
+        recommendation_title.setObjectName(theme.SECTION_TITLE)
+        recommendation_layout.addWidget(recommendation_title)
+
+        self.recommendations_layout = QVBoxLayout()
+        self.recommendations_layout.setSpacing(14)
+        recommendation_layout.addLayout(self.recommendations_layout)
+        self.recommendations_section.setVisible(False)
+        scroll_layout.addWidget(self.recommendations_section)
+
+        all_events_title = QLabel("All opportunities")
+        all_events_title.setObjectName(theme.SECTION_TITLE)
+        scroll_layout.addWidget(all_events_title)
 
         self.content_stack = QStackedWidget()
         self.content_stack.setObjectName(theme.VOLUNTEER_CONTENT_STACK)
@@ -144,8 +170,9 @@ class VolunteerPage(QWidget):
 
         self.content_stack.addWidget(self.grid_container)
         self.content_stack.addWidget(self.list_container)
-        self.scroll.setWidget(self.content_stack)
-        return self.scroll
+        scroll_layout.addWidget(self.content_stack)
+        self.results_scroll.setWidget(self.scroll_content)
+        return self.results_scroll
 
     def _build_empty_state(self):
         self.empty_wrap = QWidget()
@@ -225,15 +252,21 @@ class VolunteerPage(QWidget):
             rows = []
 
         self._clear_layouts()
+        self._refresh_recommendations()
 
         if not rows:
-            self.empty_wrap.setVisible(True)
-            self.scroll.setVisible(False)
             self.results_lbl.setText("0 results")
+            if not self.recommendations_section.isHidden():
+                self.empty_wrap.setVisible(False)
+                self.results_scroll.setVisible(True)
+                self._show_no_filtered_results()
+            else:
+                self.empty_wrap.setVisible(True)
+                self.results_scroll.setVisible(False)
             return
 
         self.empty_wrap.setVisible(False)
-        self.scroll.setVisible(True)
+        self.results_scroll.setVisible(True)
         n = len(rows)
         self.results_lbl.setText(
             f"{n} result{'s' if n != 1 else ''}"
@@ -246,6 +279,89 @@ class VolunteerPage(QWidget):
         else:
             self._populate_list(rows)
             self.content_stack.setCurrentWidget(self.list_container)
+
+    def _show_no_filtered_results(self):
+        label = QLabel("No results match your filters.")
+        label.setObjectName(theme.VOLUNTEER_EMPTY)
+        label.setWordWrap(True)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        if self.current_view == "grid":
+            self.grid_layout.addWidget(label, 0, 0)
+            self.content_stack.setCurrentWidget(self.grid_container)
+        else:
+            self.list_layout.addWidget(label)
+            self.content_stack.setCurrentWidget(self.list_container)
+
+    def _refresh_recommendations(self):
+        self._clear_recommendations()
+        if not self.current_volunteer_id:
+            self.recommendations_section.setVisible(False)
+            return
+
+        try:
+            from Volunteer.ml_recommender import rank_opportunities
+
+            user_profile = self.db.getUserProfile(
+                self.current_volunteer_id
+            )
+            signup_rows = self.db.getSignupsForVolunteer(
+                self.current_volunteer_id
+            )
+            active_signups = [
+                row for row in signup_rows
+                if (row["status"] or "") != "cancelled"
+            ]
+            joined_orgs = [
+                row for row in self.db.getOrganizations(
+                    self.current_volunteer_id
+                )
+                if row["is_member"]
+            ]
+            opportunities = self.db.getAllOpportunities()
+            recommendations, _ = rank_opportunities(
+                user_profile or {},
+                active_signups,
+                joined_orgs,
+                list(opportunities),
+                top_n=4,
+            )
+        except ImportError as e:
+            print("VolunteerPage recommendation import error:", e)
+            self._add_recommendation_message(
+                "Recommendations need scikit-learn to be installed."
+            )
+            return
+        except Exception as e:
+            print("VolunteerPage recommendation error:", e)
+            self._add_recommendation_message(
+                "Recommendations are temporarily unavailable."
+            )
+            return
+
+        if not recommendations:
+            self.recommendations_section.setVisible(False)
+            return
+
+        for row in recommendations:
+            card = self._make_card(row, "list")
+            self._recommendation_cards.append(card)
+            self.recommendations_layout.addWidget(card)
+        self.recommendations_section.setVisible(True)
+
+    def _add_recommendation_message(self, text):
+        label = QLabel(text)
+        label.setObjectName(theme.VOLUNTEER_EMPTY)
+        label.setWordWrap(True)
+        self.recommendations_layout.addWidget(label)
+        self.recommendations_section.setVisible(True)
+
+    def _clear_recommendations(self):
+        self._recommendation_cards = []
+        while self.recommendations_layout.count():
+            item = self.recommendations_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
 
     def _make_card(self, row, view_mode):
         card = EventCard(
@@ -303,7 +419,7 @@ class VolunteerPage(QWidget):
     def _grid_columns(self):
         m = self.grid_layout.contentsMargins()
         spacing = self.grid_layout.spacing()
-        avail = self.scroll.viewport().width() - m.left() - m.right()
+        avail = self.results_scroll.viewport().width() - m.left() - m.right()
         return max(
             1,
             (avail + spacing) // (EventCard.GRID_WIDTH + spacing),

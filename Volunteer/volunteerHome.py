@@ -1432,14 +1432,10 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
                 monthly.get(day(r)[:7], 0.0) + hrs(r)
             )
         data = []
-        for back in range(5, -1, -1):
-            yy, mm = today.year, today.month - back
-            while mm <= 0:
-                mm += 12
-                yy -= 1
+        for mm in range(1, today.month + 1):
             data.append((
                 calendar.month_abbr[mm],
-                monthly.get(f"{yy:04d}-{mm:02d}", 0.0),
+                monthly.get(f"{today.year:04d}-{mm:02d}", 0.0),
             ))
         self.dash_area.set_data(data)
 

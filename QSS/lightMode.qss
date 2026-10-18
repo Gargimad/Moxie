@@ -134,7 +134,10 @@ QLineEdit:focus, QDateEdit:focus, QComboBox:focus {
 QLineEdit QToolButton {
     border: none;
     background: transparent;
-    padding: 0px 6px;
+    padding: 0px 4px;
+    margin: 0px;
+    min-width: 28px;
+    min-height: 28px;
     color: #6B5B77;
 }
 
@@ -1605,6 +1608,64 @@ QPushButton#HeroLearnBtn:pressed {
     background-color: #F5F0EE;
     border: 1px solid #BFAFB3;
     border-top: 4px solid #3D4BA8;
+}
+
+/* ── Organization Opportunity Form ─────────────────────────────── */
+QFrame#OpportunityFormCard {
+    background-color: #F5F0EE;
+    border: 1px solid #BFAFB3;
+}
+
+QLabel#OpportunityFormTitle {
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-size: 30px;
+    font-weight: 700;
+    color: #2D1A3E;
+}
+
+QLabel#OpportunityFormSubtitle,
+QLabel#OpportunityFormSectionHint {
+    color: #6B5B77;
+    font-size: 14px;
+}
+
+QLabel#OpportunityFormSectionTitle {
+    color: #2D1A3E;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+QLabel#OpportunityFormLabel {
+    color: #4E3C5C;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+QLabel#OpportunityFormImageStatus {
+    color: #6B5B77;
+    font-size: 13px;
+}
+
+QFrame#OpportunityFormDivider {
+    background-color: #D8DCE3;
+    border: none;
+    max-height: 1px;
+}
+
+#OpportunityFormCard QTextEdit {
+    background-color: #FBF8F7;
+    border: 1px solid #BFAFB3;
+    padding: 11px 14px;
+    font-size: 14px;
+    color: #2D1A3E;
+    selection-background-color: #2D1A3E;
+    selection-color: #F5F0EE;
+}
+
+#OpportunityFormCard QTextEdit:focus {
+    border: 2px solid #3D4BA8;
+    padding: 10px 13px;
+    background-color: #FFFFFF;
 }
 
 /* Compact pill-style action row on the dashboard hero */

@@ -25,7 +25,8 @@ from datetime import date, datetime, timedelta, timezone
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QButtonGroup, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout,
+    QButtonGroup, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton,
+    QVBoxLayout,
 )
 
 import Events.theme as theme
@@ -41,6 +42,7 @@ NOTIF_TYPES = {
     "leave_org": ("Left an organization", "#7F8C8D"),
     "opportunity_cancelled": ("Event cancelled", "#C0392B"),
     "event_reminder": ("Event reminder", "#E67E22"),
+    "opportunity_invite": ("Opportunity invitation", "#3D4BA8"),
 }
 DEFAULT_NOTIF = ("Update", "#7F8C8D")
 
@@ -196,6 +198,14 @@ class VolunteerNotifications:
                 "pinned": False,
                 "dt": dt,
                 "when": _when_label(dt, raw),
+                "notification_type": ntype,
+                "invitation_id": rget(
+                    n, "linked_invitationID"
+                ),
+                "invitation_status": rget(n, "invitation_status"),
+                "opportunity_id": rget(
+                    n, "related_opportunityID"
+                ),
             })
 
         items.sort(key=lambda i: i["dt"] or datetime.min, reverse=True)
@@ -287,4 +297,87 @@ class VolunteerNotifications:
             )
             lay.addWidget(body)
 
+        if item.get("notification_type") == "opportunity_invite":
+            if item.get("invitation_id"):
+                self._add_invitation_actions(lay, item)
+            else:
+                unavailable = QLabel(
+                    "This invitation was sent before responses were "
+                    "supported and is no longer available."
+                )
+                unavailable.setObjectName(theme.EVENT_META_VALUE)
+                lay.addWidget(unavailable)
+
         return card
+
+    def _add_invitation_actions(self, layout, item):
+        status = item.get("invitation_status")
+        if status == "pending":
+            row = QHBoxLayout()
+            accept = QPushButton("Accept invitation")
+            accept.setObjectName(theme.PRIMARY_BTN)
+            accept.setCursor(Qt.CursorShape.PointingHandCursor)
+            accept.clicked.connect(
+                lambda: self._respond_to_invitation(item, True)
+            )
+            decline = QPushButton("Decline")
+            decline.setObjectName(theme.SECONDARY_BTN)
+            decline.setCursor(Qt.CursorShape.PointingHandCursor)
+            decline.clicked.connect(
+                lambda: self._respond_to_invitation(item, False)
+            )
+            row.addWidget(accept)
+            row.addWidget(decline)
+            row.addStretch(1)
+            layout.addLayout(row)
+            return
+
+        status_text = {
+            "accepted": "Invitation accepted — you're signed up.",
+            "declined": "Invitation declined.",
+        }.get(status, "This invitation is no longer available.")
+        status_label = QLabel(status_text)
+        status_label.setObjectName(theme.EVENT_META_VALUE)
+        layout.addWidget(status_label)
+
+    def _respond_to_invitation(self, item, accept):
+        result = self.db.respondToOpportunityInvitation(
+            self.userID, item["invitation_id"], accept
+        )
+        if result in ("accepted", "already_registered"):
+            QMessageBox.information(
+                self, "Invitation accepted",
+                "You're signed up for the opportunity."
+                if result == "accepted"
+                else "You were already signed up. The invitation is now "
+                     "marked as accepted.",
+            )
+            self._after_signup_change()
+        elif result == "declined":
+            QMessageBox.information(
+                self, "Invitation declined",
+                "You declined the invitation.",
+            )
+        elif result == "full":
+            QMessageBox.warning(
+                self, "Opportunity full",
+                "There are no spots left. The invitation is still pending.",
+            )
+        elif result == "unavailable":
+            QMessageBox.warning(
+                self, "Opportunity unavailable",
+                "This opportunity is no longer open.",
+            )
+        elif result in ("pending", "not_found"):
+            QMessageBox.warning(
+                self, "Invitation unavailable",
+                "This invitation could not be updated. Refresh and try "
+                "again.",
+            )
+        else:
+            QMessageBox.warning(
+                self, "Invitation error",
+                "Could not update the invitation. Please try again.",
+            )
+
+        self._refresh_notifications()
