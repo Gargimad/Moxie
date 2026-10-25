@@ -153,6 +153,7 @@ class OrgDashboard(QWidget):
     # ── 0. Overview ────────────────────────────────────────────────
     def _build_overview_page(self):
         page = QWidget()
+        page.setObjectName("OrgOverviewPage")
         outer = QVBoxLayout(page)
         outer.setContentsMargins(0, 0, 0, 0)
 
@@ -165,6 +166,7 @@ class OrgDashboard(QWidget):
         )
 
         content = QWidget()
+        content.setObjectName(theme.HOME_SCROLL_CONTENT)
         lay = QVBoxLayout(content)
         lay.setContentsMargins(40, 28, 40, 28)
         lay.setSpacing(22)

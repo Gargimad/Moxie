@@ -227,6 +227,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
     ]
 
     tabChanged = pyqtSignal(int)
+    notificationsUpdated = pyqtSignal()
     browseOpportunitiesRequested = pyqtSignal()
     goToProfileRequested = pyqtSignal()
 
@@ -386,11 +387,9 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         head.addStretch(1)
         if tab is not None:
             b = QPushButton(f"{link_text} →")
+            b.setObjectName(theme.DASHBOARD_LINK)
             b.setFlat(True)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setStyleSheet(
-                "QPushButton:hover { text-decoration: underline; }"
-            )
             b.clicked.connect(lambda _, i=tab: self.show_tab(i))
             head.addWidget(b)
         v.addLayout(head)
@@ -414,6 +413,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         content = QWidget()
+        content.setObjectName(theme.HOME_SCROLL_CONTENT)
         lay = QVBoxLayout(content)
         lay.setContentsMargins(40, 28, 40, 28)
         lay.setSpacing(22)

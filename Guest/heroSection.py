@@ -124,14 +124,14 @@ class HeroSection(QWidget):
         )
         v.addWidget(self.wordmark)
 
-        headline = QLabel("Volunteering that fits\nwho you're becoming.")
+        headline = QLabel("Find and manage opportunities all in one place")
         headline.setObjectName(theme.HERO_HEADLINE)
         headline.setWordWrap(True)
         v.addWidget(headline)
 
         sub = QLabel(
             "Moxie connects Georgia students to local nonprofits "
-            "through the career clusters they're already curious about."
+            "while also helping nonprofits manage their volunteers and events."
         )
         sub.setObjectName(theme.HERO_SUB)
         sub.setWordWrap(True)

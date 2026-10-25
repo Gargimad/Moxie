@@ -2252,12 +2252,21 @@ class Database:
             print("respondToOpportunityInvitation error:", e)
             return "error"
 
-    def markNotificationRead(self, notificationID):
+    def markNotificationRead(self, userID, notificationID):
         self.cursor.execute("""
             UPDATE notifications SET read_at = CURRENT_TIMESTAMP
-            WHERE notificationID = ?
-        """, (notificationID,))
+            WHERE notificationID = ? AND userID = ? AND read_at IS NULL
+        """, (notificationID, userID))
         self.connection.commit()
+        return self.cursor.rowcount > 0
+
+    def markNotificationsRead(self, userID):
+        self.cursor.execute("""
+            UPDATE notifications SET read_at = CURRENT_TIMESTAMP
+            WHERE userID = ? AND read_at IS NULL
+        """, (userID,))
+        self.connection.commit()
+        return self.cursor.rowcount > 0
 
     # ── Announcements ─────────────────────────────────────────────────
     def addAnnouncement(self, orgID, title, body, pinned=0):
@@ -2662,6 +2671,36 @@ class Database:
             {"volunteer": v, "score": s, "shared_clusters": c}
             for s, v, c in scored[:limit]
         ]
+
+    def getAvailableVolunteersForOpportunity(self, orgID, opportunityID):
+        """Return volunteers eligible for a new invitation to this event."""
+        self.cursor.execute("""
+            SELECT u.userID, u.email,
+                   vp.first_name, vp.last_name, vp.city, vp.state,
+                   vp.high_school
+            FROM users u
+            LEFT JOIN volunteer_profiles vp ON vp.userID = u.userID
+            LEFT JOIN org_volunteer_flags f
+                ON f.orgID = ? AND f.userID = u.userID
+            WHERE u.role = 'volunteer'
+              AND COALESCE(f.banned, 0) = 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM event_signups s
+                  WHERE s.userID = u.userID
+                    AND s.opportunityID = ?
+                    AND s.status = 'registered'
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM opportunity_invitations i
+                  WHERE i.orgID = ?
+                    AND i.userID = u.userID
+                    AND i.opportunityID = ?
+                    AND i.status = 'pending'
+              )
+            ORDER BY LOWER(COALESCE(vp.last_name, '')),
+                     LOWER(COALESCE(vp.first_name, '')), u.userID
+        """, (orgID, opportunityID, orgID, opportunityID))
+        return self.cursor.fetchall()
 
     def notifyVolunteersAboutOpportunity(self, opportunityID):
         """

@@ -1,9 +1,19 @@
 """theme.py — Shared object-name constants and asset paths."""
 import os
 
+from PyQt6.QtGui import QColor, QFontDatabase, QPalette
+
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(CURRENT_DIR)
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+_fonts_loaded = False
+
+FONT_FILES = {
+    "Federo": "Federo-Regular.ttf",
+    "Luxurious Roman": "LuxuriousRoman-Regular.ttf",
+    "Ribeye": "Ribeye-Regular.ttf",
+    "Sail": "Sail-Regular.ttf",
+}
 
 
 def asset(filename: str) -> str:
@@ -11,16 +21,59 @@ def asset(filename: str) -> str:
     return os.path.join(ASSETS_DIR, filename)
 
 
+def _load_fonts() -> None:
+    global _fonts_loaded
+    if _fonts_loaded:
+        return
+
+    for family, filename in FONT_FILES.items():
+        path = os.path.join(ASSETS_DIR, "fonts", filename)
+        font_id = QFontDatabase.addApplicationFont(path)
+        if font_id < 0:
+            print(f"[theme] Could not load {family} font: {path}")
+        elif family not in QFontDatabase.applicationFontFamilies(font_id):
+            print(f"[theme] Loaded font does not provide {family}: {path}")
+
+    _fonts_loaded = True
+
+
 def apply_theme(app, is_dark: bool) -> bool:
+    _load_fonts()
     filename = "darkMode.qss" if is_dark else "lightMode.qss"
     path = os.path.join(BASE_DIR, "QSS", filename)
     try:
         with open(path, "r", encoding="utf-8") as f:
             app.setStyleSheet(f.read())
-        return True
     except FileNotFoundError:
         print(f"[theme] Stylesheet not found: {path}")
         return False
+
+    palette = QPalette()
+    if is_dark:
+        window, text, base, highlight, highlighted_text = (
+            "#1E1626", "#EDE6F2", "#251A2E", "#B39CDB", "#1E1626"
+        )
+        button, button_text = "#2E2238", "#EDE6F2"
+    else:
+        window, text, base, highlight, highlighted_text = (
+            "#D8CBC7", "#2D1A3E", "#FBF8F7", "#2D1A3E", "#F5F0EE"
+        )
+        button, button_text = "#F5F0EE", "#2D1A3E"
+
+    for role, color in (
+        (QPalette.ColorRole.Window, window),
+        (QPalette.ColorRole.WindowText, text),
+        (QPalette.ColorRole.Base, base),
+        (QPalette.ColorRole.AlternateBase, button),
+        (QPalette.ColorRole.Text, text),
+        (QPalette.ColorRole.Button, button),
+        (QPalette.ColorRole.ButtonText, button_text),
+        (QPalette.ColorRole.Highlight, highlight),
+        (QPalette.ColorRole.HighlightedText, highlighted_text),
+    ):
+        palette.setColor(role, QColor(color))
+    app.setPalette(palette)
+    return True
 
 
 # ── Navigation / chrome ───────────────────────────────────────────────
@@ -185,6 +238,10 @@ VOLUNTEER_EMPTY = "VolunteerEmpty"
 VOLUNTEER_EMPTY_BTN = "VolunteerEmptyBtn"
 VOLUNTEER_RESULTS_COUNT = "VolunteerResultsCount"
 VIEW_TOGGLE_BTN = "ViewToggleBtn"
+DASHBOARD_LINK = "DashboardLink"
+NOTIFICATION_UNREAD = "NotificationUnread"
+NOTIFICATION_READ = "NotificationRead"
+MARK_ALL_READ_BTN = "MarkAllReadBtn"
 
 # ── Org dashboard ─────────────────────────────────────────────────────
 ORG_DASHBOARD = "OrgDashboard"

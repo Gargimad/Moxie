@@ -116,9 +116,7 @@ class VolunteerNotifications:
         group.setExclusive(True)
         for key, text in FILTERS:
             btn = QPushButton(text)
-            # Styled by the existing #ViewToggleBtn rule in the stylesheet
-            # (swap in theme.VIEW_TOGGLE_BTN if your theme.py defines it).
-            btn.setObjectName("ViewToggleBtn")
+            btn.setObjectName(theme.VIEW_TOGGLE_BTN)
             btn.setCheckable(True)
             btn.setChecked(key == "all")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -127,6 +125,15 @@ class VolunteerNotifications:
             bar.addWidget(btn)
             self._notif_btns[key] = (btn, text)
         bar.addStretch(1)
+        self._mark_all_read_btn = QPushButton("Mark all as read")
+        self._mark_all_read_btn.setObjectName(theme.MARK_ALL_READ_BTN)
+        self._mark_all_read_btn.setCursor(
+            Qt.CursorShape.PointingHandCursor
+        )
+        self._mark_all_read_btn.clicked.connect(
+            self._mark_all_notifications_read
+        )
+        bar.addWidget(self._mark_all_read_btn)
         top.addLayout(bar)
         return page
 
@@ -145,10 +152,19 @@ class VolunteerNotifications:
             "announcement": n_ann,
             "activity": len(self._notif_items) - n_ann,
         }
+        unread_count = sum(
+            item.get("read") is False for item in self._notif_items
+        )
+        self._mark_all_read_btn.setVisible(unread_count > 0)
         for key, (btn, text) in self._notif_btns.items():
             btn.setText(f"{text} ({counts[key]})" if counts[key] else text)
 
         self._render_notifications()
+
+    def _mark_all_notifications_read(self):
+        if self._db_action("markNotificationsRead", self.userID):
+            self.notificationsUpdated.emit()
+            self._refresh_notifications()
 
     # ── Data ──────────────────────────────────────────────────────────
     def _load_feed_items(self):
@@ -158,6 +174,18 @@ class VolunteerNotifications:
         from Volunteer.volunteerHome import org_color, rget
 
         items = []
+        notifications = self._db(
+            "getNotifications", self.userID, default=[]
+        ) or []
+        announcement_states = {}
+        for n in notifications:
+            ntype = str(
+                rget(n, "type", "") or rget(n, "notification_type", "") or ""
+            )
+            if ntype == "announcement":
+                announcement_states.setdefault(
+                    str(rget(n, "message", "") or ""), n
+                )
 
         # 1) Announcements from every org the volunteer has joined or
         #    signed up with (the query lives in db.py).
@@ -168,19 +196,29 @@ class VolunteerNotifications:
             name = str(rget(a, "org_name", "") or "")
             raw = rget(a, "created_at", "")
             dt = _parse_dt(raw)
+            title = str(rget(a, "title", "") or "Announcement")
+            body = str(rget(a, "body", "") or "")
+            preview = body[:120] + ("…" if len(body) > 120 else "")
+            status = announcement_states.get(f"{title} — {preview}")
             items.append({
                 "kind": "announcement",
-                "title": str(rget(a, "title", "") or "Announcement"),
-                "body": str(rget(a, "body", "") or ""),
+                "title": title,
+                "body": body,
                 "org": name,
                 "color": org_color(name),
                 "pinned": bool(rget(a, "pinned", 0)),
                 "dt": dt,
                 "when": _when_label(dt, raw),
+                "notification_id": (
+                    rget(status, "notificationID") if status else None
+                ),
+                "read": (
+                    bool(rget(status, "read_at")) if status else None
+                ),
             })
 
         # 2) The volunteer's own activity notifications
-        for n in self._db("getNotifications", self.userID, default=[]) or []:
+        for n in notifications:
             ntype = str(
                 rget(n, "type", "") or rget(n, "notification_type", "") or ""
             )
@@ -199,6 +237,8 @@ class VolunteerNotifications:
                 "dt": dt,
                 "when": _when_label(dt, raw),
                 "notification_type": ntype,
+                "notification_id": rget(n, "notificationID"),
+                "read": bool(rget(n, "read_at")),
                 "invitation_id": rget(
                     n, "linked_invitationID"
                 ),
@@ -269,6 +309,14 @@ class VolunteerNotifications:
         title.setWordWrap(True)
         head.addWidget(title, 1)
 
+        if item.get("read") is not None:
+            state = QLabel("READ" if item["read"] else "UNREAD")
+            state.setObjectName(
+                theme.NOTIFICATION_READ
+                if item["read"] else theme.NOTIFICATION_UNREAD
+            )
+            head.addWidget(state)
+
         if item["pinned"]:
             pin = QLabel("PINNED")
             pin.setObjectName(theme.EVENT_STATUS_BADGE)
@@ -278,6 +326,15 @@ class VolunteerNotifications:
         when.setObjectName("EventOrg")          # muted italic, from the QSS
         head.addWidget(when)
         lay.addLayout(head)
+
+        if item.get("notification_id") and item.get("read") is False:
+            mark_read = QPushButton("Mark as read")
+            mark_read.setObjectName(theme.MARK_ALL_READ_BTN)
+            mark_read.setCursor(Qt.CursorShape.PointingHandCursor)
+            mark_read.clicked.connect(
+                lambda _, i=item: self._mark_notification_read(i)
+            )
+            lay.addWidget(mark_read, 0, Qt.AlignmentFlag.AlignLeft)
 
         if item["org"]:
             org = QLabel(f"From {item['org']}")
@@ -309,6 +366,13 @@ class VolunteerNotifications:
                 lay.addWidget(unavailable)
 
         return card
+
+    def _mark_notification_read(self, item):
+        if self._db_action(
+            "markNotificationRead", self.userID, item["notification_id"]
+        ):
+            self.notificationsUpdated.emit()
+            self._refresh_notifications()
 
     def _add_invitation_actions(self, layout, item):
         status = item.get("invitation_status")
@@ -380,4 +444,5 @@ class VolunteerNotifications:
                 "Could not update the invitation. Please try again.",
             )
 
+        self.notificationsUpdated.emit()
         self._refresh_notifications()

@@ -141,7 +141,25 @@ class OrgRecommendationsPage(QWidget):
             opp["opportunityID"], limit=8
         )
 
-        if not matches:
+        if matches:
+            # Table-style header row
+            header = QWidget()
+            header.setObjectName("OrgRecTableHeader")
+            hl = QHBoxLayout(header)
+            hl.setContentsMargins(12, 6, 12, 6)
+            hl.setSpacing(12)
+            hl.addWidget(self._col_label("Volunteer", 0))
+            hl.addStretch(2)
+            hl.addWidget(self._col_label("Match", 0))
+            hl.addStretch(1)
+            hl.addWidget(self._col_label("Why", 0))
+            hl.addStretch(2)
+            hl.addWidget(self._col_label("", 0))
+            v.addWidget(header)
+
+            for entry in matches:
+                v.addWidget(self._make_volunteer_row(entry, opp))
+        else:
             none = QLabel(
                 "No close matches yet — tag this event with a few "
                 "career clusters and volunteers whose profiles overlap "
@@ -150,25 +168,39 @@ class OrgRecommendationsPage(QWidget):
             none.setObjectName(theme.VOLUNTEER_EMPTY)
             none.setWordWrap(True)
             v.addWidget(none)
-            return wrapper
 
-        # Table-style header row
-        header = QWidget()
-        header.setObjectName("OrgRecTableHeader")
-        hl = QHBoxLayout(header)
-        hl.setContentsMargins(12, 6, 12, 6)
-        hl.setSpacing(12)
-        hl.addWidget(self._col_label("Volunteer", 0))
-        hl.addStretch(2)
-        hl.addWidget(self._col_label("Match", 0))
-        hl.addStretch(1)
-        hl.addWidget(self._col_label("Why", 0))
-        hl.addStretch(2)
-        hl.addWidget(self._col_label("", 0))
-        v.addWidget(header)
+        all_volunteers = self.db.getAvailableVolunteersForOpportunity(
+            self.org["orgID"], opp["opportunityID"]
+        ) or []
+        all_volunteers = [dict(volunteer) for volunteer in all_volunteers]
+        recommended_ids = {
+            entry["volunteer"]["userID"] for entry in matches
+        }
+        other_volunteers = [
+            volunteer for volunteer in all_volunteers
+            if volunteer["userID"] not in recommended_ids
+        ]
 
-        for entry in matches:
-            v.addWidget(self._make_volunteer_row(entry, opp))
+        all_heading = QLabel("All other volunteers")
+        all_heading.setObjectName(theme.MATCH_STEP_TITLE)
+        v.addWidget(all_heading)
+        all_subtitle = QLabel(
+            "Browse every other volunteer registered in Moxie who is "
+            "available to invite to this opportunity."
+        )
+        all_subtitle.setObjectName(theme.EVENT_META_VALUE)
+        all_subtitle.setWordWrap(True)
+        v.addWidget(all_subtitle)
+
+        if not other_volunteers:
+            none = QLabel("No other volunteers are currently available.")
+            none.setObjectName(theme.VOLUNTEER_EMPTY)
+            v.addWidget(none)
+        else:
+            for volunteer in other_volunteers:
+                v.addWidget(self._make_volunteer_row(
+                    {"volunteer": volunteer}, opp, show_match=False
+                ))
 
         return wrapper
 
@@ -179,7 +211,7 @@ class OrgRecommendationsPage(QWidget):
         return lbl
 
     # ── Volunteer row ──────────────────────────────────────────────
-    def _make_volunteer_row(self, entry, opp):
+    def _make_volunteer_row(self, entry, opp, show_match=True):
         vol = entry["volunteer"]
         name = " ".join(
             x for x in (vol.get("first_name"), vol.get("last_name"))
@@ -222,28 +254,33 @@ class OrgRecommendationsPage(QWidget):
             name_col.addWidget(sub)
         h.addLayout(name_col, 3)
 
-        # Match % badge
-        score = int(round(min(1.0, entry["score"] / 6.0) * 100))
-        score_lbl = QLabel(f"{score}%")
-        score_lbl.setObjectName("OrgRecScore")
-        score_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        score_lbl.setFixedWidth(56)
-        h.addWidget(score_lbl, 0)
+        if show_match:
+            # Match % badge
+            score = int(round(min(1.0, entry["score"] / 6.0) * 100))
+            score_lbl = QLabel(f"{score}%")
+            score_lbl.setObjectName("OrgRecScore")
+            score_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            score_lbl.setFixedWidth(56)
+            h.addWidget(score_lbl, 0)
 
-        # Reason chips
-        reason_col = QVBoxLayout()
-        reason_col.setSpacing(2)
-        if entry["shared_clusters"]:
-            r = QLabel("Match: " + ", ".join(entry["shared_clusters"]))
-            r.setObjectName("OrgRecReason")
-            r.setWordWrap(True)
-            reason_col.addWidget(r)
-        past = vol.get("past_with_org") or 0
-        if past:
-            p = QLabel(f"{past} event{'s' if past != 1 else ''} with you")
-            p.setObjectName("OrgRecReason")
-            reason_col.addWidget(p)
-        h.addLayout(reason_col, 3)
+            # Reason chips
+            reason_col = QVBoxLayout()
+            reason_col.setSpacing(2)
+            if entry["shared_clusters"]:
+                r = QLabel("Match: " + ", ".join(entry["shared_clusters"]))
+                r.setObjectName("OrgRecReason")
+                r.setWordWrap(True)
+                reason_col.addWidget(r)
+            past = vol.get("past_with_org") or 0
+            if past:
+                p = QLabel(
+                    f"{past} event{'s' if past != 1 else ''} with you"
+                )
+                p.setObjectName("OrgRecReason")
+                reason_col.addWidget(p)
+            h.addLayout(reason_col, 3)
+        else:
+            h.addStretch(1)
 
         # Invite button
         invite = QPushButton("Invite")

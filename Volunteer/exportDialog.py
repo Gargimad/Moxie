@@ -7,8 +7,10 @@ clean record for NHS, honor societies, or award applications.
 import csv
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QRectF, QDate
-from PyQt6.QtGui import QPainter, QPdfWriter, QPageSize, QFont, QPageLayout
+from PyQt6.QtCore import Qt, QRectF, QDate, QMarginsF
+from PyQt6.QtGui import (
+    QColor, QFont, QFontMetricsF, QPainter, QPageLayout, QPageSize, QPdfWriter,
+)
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
     QDateEdit, QMessageBox, QFileDialog, QFrame, QCheckBox,
@@ -215,53 +217,207 @@ class ExportDialog(QDialog):
     def _write_pdf(self, path, ds, headers, rows):
         writer = QPdfWriter(path)
         writer.setPageSize(QPageSize(QPageSize.PageSizeId.Letter))
-        writer.setPageMargins(QPageLayout().margins())
+        writer.setPageMargins(
+            QMarginsF(14, 14, 14, 14), QPageLayout.Unit.Millimeter
+        )
         writer.setResolution(150)
 
         painter = QPainter(writer)   # begins implicitly, do NOT call begin()
         try:
-            base = QFont("Helvetica", 10)
-            heading = QFont("Helvetica", 16, QFont.Weight.Bold)
-            sub = QFont("Helvetica", 10, QFont.Weight.Normal)
-
-            painter.setFont(heading)
-            painter.drawText(
-                QRectF(0, 0, writer.width(), 400),
-                Qt.AlignmentFlag.AlignLeft,
-                "Moxie data export",
+            page_rect = writer.pageLayout().paintRectPixels(
+                writer.resolution()
             )
-            painter.setFont(sub)
-            painter.drawText(
-                QRectF(0, 300, writer.width(), 200),
-                Qt.AlignmentFlag.AlignLeft,
-                f"{ds} - generated {datetime.now():%Y-%m-%d %H:%M}",
+            left = page_rect.x()
+            right = page_rect.x() + page_rect.width()
+            top = page_rect.y()
+            footer_y = page_rect.y() + page_rect.height() - 32
+            content_width = page_rect.width()
+
+            title = {
+                "hours": "Volunteer hours",
+                "registrations": "Event registrations",
+                "bookmarks": "Bookmarked events",
+            }.get(ds, "Moxie data export")
+            generated = datetime.now().strftime("%Y-%m-%d %H:%M")
+            body_font = QFont("Helvetica", 9)
+            header_font = QFont("Helvetica", 9, QFont.Weight.Bold)
+            painter.setFont(body_font)
+            metrics = QFontMetricsF(body_font)
+            cell_flags = (
+                Qt.AlignmentFlag.AlignLeft
+                | Qt.AlignmentFlag.AlignVCenter
+                | Qt.TextFlag.TextWordWrap
             )
-
-            painter.setFont(base)
-            col_w = writer.width() // max(1, len(headers))
-            y = 600
-            row_h = 260
-
-            for i, h in enumerate(headers):
-                painter.drawText(
-                    QRectF(i * col_w, y, col_w, row_h),
-                    Qt.AlignmentFlag.AlignLeft
-                    | Qt.AlignmentFlag.AlignVCenter,
-                    str(h),
+            padding = 10
+            table_widths = {
+                "hours": (0.14, 0.32, 0.27, 0.12, 0.15),
+                "registrations": (0.15, 0.28, 0.16, 0.23, 0.18),
+                "bookmarks": (0.16, 0.28, 0.15, 0.23, 0.18),
+            }.get(ds, ())
+            if len(table_widths) != len(headers):
+                table_widths = tuple(
+                    1 / max(1, len(headers)) for _ in headers
                 )
-            y += row_h
+            else:
+                weight_total = sum(table_widths)
+                table_widths = tuple(
+                    weight / weight_total for weight in table_widths
+                )
+            column_widths = [
+                content_width * weight for weight in table_widths
+            ]
 
-            for row in rows:
-                if y > writer.height() - 400:
-                    writer.newPage()
-                    y = 300
-                for i, cell in enumerate(row):
+            def draw_table_header(y):
+                painter.fillRect(
+                    QRectF(left, y, content_width, 38),
+                    QColor("#2D1A3E"),
+                )
+                painter.setFont(header_font)
+                painter.setPen(QColor("#FFFFFF"))
+                x = left
+                for header, width in zip(headers, column_widths):
                     painter.drawText(
-                        QRectF(i * col_w, y, col_w, row_h),
+                        QRectF(x + padding, y, width - 2 * padding, 38),
                         Qt.AlignmentFlag.AlignLeft
                         | Qt.AlignmentFlag.AlignVCenter,
-                        str(cell),
+                        str(header),
                     )
-                y += row_h
+                    x += width
+                painter.setFont(body_font)
+                painter.setPen(QColor("#2D1A3E"))
+                return y + 38
+
+            def draw_footer(page_number):
+                painter.setPen(QColor("#D8CBC7"))
+                painter.drawLine(
+                    int(left), int(footer_y),
+                    int(right), int(footer_y),
+                )
+                painter.setPen(QColor("#6B5B77"))
+                painter.drawText(
+                    QRectF(left, footer_y + 5, content_width / 2, 24),
+                    Qt.AlignmentFlag.AlignLeft
+                    | Qt.AlignmentFlag.AlignVCenter,
+                    "Moxie volunteer impact record",
+                )
+                painter.drawText(
+                    QRectF(
+                        left + content_width / 2, footer_y + 5,
+                        content_width / 2, 24,
+                    ),
+                    Qt.AlignmentFlag.AlignRight
+                    | Qt.AlignmentFlag.AlignVCenter,
+                    f"Page {page_number}",
+                )
+
+            def draw_heading(first_page):
+                painter.fillRect(
+                    QRectF(left, top, 5, 74), QColor("#3D4BA8")
+                )
+                painter.setPen(QColor("#2D1A3E"))
+                heading_font = QFont(
+                    "Helvetica", 20 if first_page else 13,
+                    QFont.Weight.Bold,
+                )
+                painter.setFont(heading_font)
+                heading_y = top + (10 if first_page else 0)
+                heading_height = 42 if first_page else 30
+                heading_text = title if first_page else f"{title} (continued)"
+                painter.drawText(
+                    QRectF(left + 18, heading_y, content_width - 18, heading_height),
+                    Qt.AlignmentFlag.AlignLeft
+                    | Qt.AlignmentFlag.AlignVCenter,
+                    heading_text,
+                )
+                if first_page:
+                    painter.setFont(body_font)
+                    painter.setPen(QColor("#6B5B77"))
+                    painter.drawText(
+                        QRectF(left + 18, top + 53, content_width - 18, 24),
+                        Qt.AlignmentFlag.AlignLeft
+                        | Qt.AlignmentFlag.AlignVCenter,
+                        f"Generated {generated}",
+                    )
+                    summary = f"{len(rows)} records"
+                    if ds == "hours" and len(headers) > 3:
+                        total_hours = sum(
+                            float(row[3] or 0) for row in rows
+                        )
+                        verified_count = sum(
+                            1 for row in rows
+                            if len(row) > 4 and str(row[4]).lower() == "yes"
+                        )
+                        summary += (
+                            f"   |   {total_hours:.2f} total hours"
+                            f"   |   {verified_count} verified"
+                        )
+                    summary_y = top + 91
+                    painter.fillRect(
+                        QRectF(left, summary_y, content_width, 38),
+                        QColor("#F5F0EE"),
+                    )
+                    painter.setPen(QColor("#2D1A3E"))
+                    painter.drawText(
+                        QRectF(
+                            left + padding, summary_y,
+                            content_width - 2 * padding, 38,
+                        ),
+                        Qt.AlignmentFlag.AlignLeft
+                        | Qt.AlignmentFlag.AlignVCenter,
+                        summary,
+                    )
+                    return summary_y + 52
+                return top + 42
+
+            page_number = 1
+            y = draw_table_header(draw_heading(first_page=True))
+            for row_index, row in enumerate(rows):
+                cells = [
+                    str(row[index]) if index < len(row) else ""
+                    for index in range(len(headers))
+                ]
+                cell_heights = []
+                for index, cell in enumerate(cells):
+                    text_rect = metrics.boundingRect(
+                        QRectF(
+                            0, 0, max(1, column_widths[index] - 2 * padding),
+                            10000,
+                        ),
+                        cell_flags,
+                        cell,
+                    )
+                    cell_heights.append(text_rect.height() + 2 * padding)
+                row_height = max(38, max(cell_heights, default=38))
+                if y + row_height > footer_y:
+                    draw_footer(page_number)
+                    writer.newPage()
+                    page_number += 1
+                    y = draw_table_header(draw_heading(first_page=False))
+
+                painter.fillRect(
+                    QRectF(left, y, content_width, row_height),
+                    QColor("#F5F0EE" if row_index % 2 == 0 else "#FFFFFF"),
+                )
+                painter.setPen(QColor("#2D1A3E"))
+                x = left
+                for cell, width in zip(cells, column_widths):
+                    painter.drawText(
+                        QRectF(
+                            x + padding, y + padding,
+                            width - 2 * padding,
+                            row_height - 2 * padding,
+                        ),
+                        cell_flags,
+                        cell,
+                    )
+                    x += width
+                painter.setPen(QColor("#E4DAD6"))
+                painter.drawLine(
+                    int(left), int(y + row_height),
+                    int(right), int(y + row_height),
+                )
+                y += row_height
+
+            draw_footer(page_number)
         finally:
             painter.end()

@@ -234,6 +234,9 @@ class Landing(QMainWindow):
         self.volunteerHomePage.tabChanged.connect(
             lambda _i: self._sync_nav_highlight()
         )
+        self.volunteerHomePage.notificationsUpdated.connect(
+            self._refresh_notif_badge
+        )
         self.volunteerHomePage.browseOpportunitiesRequested.connect(
             self.show_volunteer_listing_page
         )
@@ -417,8 +420,7 @@ class Landing(QMainWindow):
     def show_volunteer_tab(self, idx):
         self._goto(self.volunteerHomePage)
         self.volunteerHomePage.show_tab(idx)
-        # Opening the notifications tab should clear the badge count
-        # on the next poll; volunteerNotifications marks them read.
+        # Refresh immediately after opening the notifications tab.
         if idx == 4:
             self._refresh_notif_badge()
 
@@ -635,8 +637,8 @@ class Landing(QMainWindow):
     def _refresh_notif_badge(self):
         """Poll the DB and update the badge with the unread count.
 
-        Badge only shows for volunteers. `read_at` is populated when the
-        notifications tab is opened (see volunteerNotifications.py)."""
+        The badge is volunteer-only and clears as notifications are marked
+        read from the notifications tab."""
         if not self.current_user:
             self.notif_badge.setVisible(False)
             return
@@ -644,7 +646,8 @@ class Landing(QMainWindow):
             rows = self.db.getNotifications(
                 self.current_user["userID"], limit=50
             ) or []
-        except Exception:
+        except Exception as e:
+            print("Could not refresh notification badge:", e)
             return
         unread = sum(1 for r in rows if not r["read_at"])
         if unread:

@@ -42,6 +42,10 @@
    ========================================================================== */
 
 /* ── Window & General Layout ───────────────────────────────────── */
+* {
+    font-family: "Federo";
+}
+
 QMainWindow {
     background-color: #D8CBC7;
 }
@@ -86,7 +90,7 @@ QMainWindow {
 }
 
 #FormTitle {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-family: "Ribeye";
     font-size: 30px;
     font-weight: bold;
     color: #2D1A3E;
@@ -220,6 +224,15 @@ QPushButton:focus {
 QPushButton::menu-indicator {
     image: none;
     width: 0px;
+}
+
+QMessageBox QPushButton {
+    background-color: #F5F0EE;
+    color: #2D1A3E;
+    border: 1px solid #3D4BA8;
+    padding: 6px 14px;
+    min-width: 64px;
+    min-height: 30px;
 }
 
 /* ── Primary / Secondary Buttons ───────────────────────────────── */
@@ -358,7 +371,7 @@ QScrollBar::add-page, QScrollBar::sub-page {
     color: #1F2328;
     font-size: 16px;
     font-weight: 600;
-    font-family: "Segoe UI", "SF Pro Display", Arial, sans-serif;
+    font-family: "Federo";
 }
 
 /* ==========================================================================
@@ -499,9 +512,13 @@ QListWidget#SearchSuggestions::item:selected {
 }
 
 #SectionTitle {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-family: "Ribeye";
     font-size: 26px;
     font-weight: bold;
+    color: #2D1A3E;
+}
+
+#VolunteerPage #SectionTitle {
     color: #2D1A3E;
 }
 
@@ -577,10 +594,34 @@ QListWidget#SearchSuggestions::item:selected {
 }
 
 #FAQTitle {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-family: "Ribeye";
     font-size: 26px;
     font-weight: bold;
     color: #2D1A3E;
+}
+
+#FAQSubtitle {
+    color: #4E3C5C;
+    font-size: 14px;
+}
+
+#FAQCategoryHeading {
+    color: #2D1A3E;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+#FAQCatPill {
+    background-color: #F5F0EE;
+    border: 1px solid #BFAFB3;
+    color: #4E3C5C;
+    padding: 8px 12px;
+}
+
+#FAQCatPill:checked {
+    background-color: #2D1A3E;
+    border-color: #2D1A3E;
+    color: #F5F0EE;
 }
 
 #FAQSearchInput {
@@ -665,7 +706,7 @@ QListWidget#SearchSuggestions::item:selected {
 }
 
 #VolunteerTitle {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-family: "Ribeye";
     font-size: 24px;
     font-weight: bold;
     color: #2D1A3E;
@@ -707,6 +748,49 @@ QListWidget#SearchSuggestions::item:selected {
 #ViewToggleBtn:focus {
     border: 2px solid #3D4BA8;
     padding: 7px 15px;
+}
+
+#DashboardLink {
+    background-color: rgba(61, 75, 168, 0.08);
+    color: #2D1A3E;
+    border: 1px solid #3D4BA8;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: bold;
+}
+#DashboardLink:hover {
+    background-color: #2D1A3E;
+    color: #F5F0EE;
+}
+#DashboardLink:focus {
+    border: 2px solid #3D4BA8;
+}
+
+#MarkAllReadBtn {
+    background-color: transparent;
+    color: #2D1A3E;
+    border: 1px solid #3D4BA8;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+#MarkAllReadBtn:hover {
+    background-color: #2D1A3E;
+    color: #F5F0EE;
+}
+#NotificationUnread {
+    background-color: #3D4BA8;
+    color: #FFFFFF;
+    padding: 3px 7px;
+    font-size: 10px;
+    font-weight: bold;
+}
+#NotificationRead {
+    background-color: #E4DAD6;
+    color: #6B5B77;
+    padding: 3px 7px;
+    font-size: 10px;
+    font-weight: bold;
 }
 
 #VolunteerResultsCount {
@@ -1183,22 +1267,26 @@ QPushButton#BackBtn:pressed {
 
 /* ── Mission hero typography (old hero section) ──────────────── */
 QLabel#HeroMissionTitle {
+    font-family: "Ribeye";
     font-size: 90px;
     font-weight: 900;
     letter-spacing: -2px;
     color: #2D1A3E;
 }
 QLabel#HeroMissionBodyLg {
+    font-family: "Luxurious Roman";
     font-size: 25px;
     font-weight: 400;
     color: #2D1A3E;
 }
 QLabel#HeroMissionBodyMd {
+    font-family: "Luxurious Roman";
     font-size: 30px;
     font-weight: 400;
     color: #2D1A3E;
 }
 QLabel#HeroMissionBodySm {
+    font-family: "Luxurious Roman";
     font-size: 25px;
     font-weight: 700;
     color: #2D1A3E;
@@ -1230,13 +1318,14 @@ QPushButton#HeroLearnBtn:pressed {
 #HeroWordmark   { padding: 0; margin: 0; }
 
 #HeroHeadline {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-family: "Ribeye";
     font-size: 44px;
     font-weight: 700;
     color: #2D1A3E;
     line-height: 1.15em;
 }
 #HeroSub {
+    font-family: "Luxurious Roman";
     font-size: 15px;
     color: #4E3C5C;
     line-height: 1.55em;
@@ -1260,11 +1349,12 @@ QPushButton#HeroLearnBtn:pressed {
     border-radius: 0px;
 }
 #MatchStepTitle {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-family: "Ribeye";
     font-size: 22px;
     font-weight: bold;
     color: #2D1A3E;
 }
+
 #MatchChip {
     background-color: #FBF8F7;
     color: #2D1A3E;
@@ -1538,7 +1628,7 @@ QPushButton#HeroLearnBtn:pressed {
     border-top: 3px solid #2D1A3E;
 }
 #MoxieKpiValue {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-family: "Luxurious Roman";
     font-size: 34px;
     font-weight: 900;
     color: #2D1A3E;
@@ -1572,7 +1662,7 @@ QPushButton#HeroLearnBtn:pressed {
     padding: 4px 0 2px 0;
 }
 #MoxieSectionTitle {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-family: "Ribeye";
     font-size: 20px;
     font-weight: 700;
     color: #2D1A3E;
@@ -1581,7 +1671,7 @@ QPushButton#HeroLearnBtn:pressed {
 
 /* Big hero title on the dashboard overview */
 #MoxieHeroTitle {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-family: "Ribeye";
     font-size: 40px;
     font-weight: 900;
     color: #2D1A3E;
@@ -1598,6 +1688,11 @@ QPushButton#HeroLearnBtn:pressed {
     background-color: #FFFFFF;
     border: 1px solid #D8DCE3;
     border-radius: 0px;
+}
+#OrgDashboard,
+#OrgOverviewPage {
+    background-color: #D8CBC7;
+    color: #2D1A3E;
 }
 #MoxieChartCardDarkAccent {
     background-color: #F5F0EE;
@@ -1617,7 +1712,7 @@ QFrame#OpportunityFormCard {
 }
 
 QLabel#OpportunityFormTitle {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-family: "Ribeye";
     font-size: 30px;
     font-weight: 700;
     color: #2D1A3E;
@@ -1756,4 +1851,36 @@ QFrame#OpportunityFormDivider {
 }
 #FilterSidebarClear:hover {
     background-color: #3D4BA8;
+}
+
+#NavLogo {
+    font-family: "Federo";
+}
+#HeroWordmark {
+    font-family: "Sail";
+}
+#FormTitle,
+#SectionTitle,
+#FeatureTitle,
+#OpportunityRowTitle,
+#FAQTitle,
+#VolunteerTitle,
+#EventTitle,
+#EventTitleList,
+#MoxieSectionTitle,
+#MoxieHeroTitle,
+#OpportunityFormTitle,
+#OpportunityFormSectionTitle {
+    font-family: "Ribeye";
+}
+#MoxieKpiValue {
+    font-family: "Luxurious Roman";
+}
+#HeroSub,
+#MoxieHeroSub,
+#FormSubtitle,
+#OpportunityFormSubtitle,
+#OpportunityFormSectionHint,
+#SloganText {
+    font-family: "Luxurious Roman";
 }
