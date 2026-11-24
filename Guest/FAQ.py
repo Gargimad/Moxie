@@ -12,12 +12,18 @@ FAQ.py — Moxie FAQ page, styled after the Bolt FAQ pattern:
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QScrollArea, QFrame, QPushButton, QButtonGroup,
+    QButtonGroup,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
-
 
 categories = [
     "Getting Started",
@@ -27,7 +33,7 @@ categories = [
     "Account & Support",
 ]
 
-faqData = [
+FAQ_DATA = [
     # ── Getting Started ───────────────────────────────────────────────
     {
         "category": "Getting Started",
@@ -270,7 +276,7 @@ class FAQItem(QFrame):
 
     def __init__(self, question: str, answer: str, parent=None):
         super().__init__(parent)
-        self.setObjectName(theme.faqItem)
+        self.setObjectName(theme.FAQ_ITEM)
         self.is_expanded = False
 
         layout = QVBoxLayout(self)
@@ -438,7 +444,7 @@ class FAQPage(QWidget):
             self.content_layout.addWidget(heading)
             self.category_headings[cat] = heading
 
-            for faq in faqData:
+            for faq in FAQ_DATA:
                 if faq["category"] != cat:
                     continue
                 item = FAQItem(faq["question"], faq["answer"])
@@ -478,12 +484,12 @@ class FAQPage(QWidget):
 
         for faq, widget in self.faq_widgets:
             matches_query = (
-                not query
-                or query in faq["question"].lower()
-                or query in faq["answer"].lower()
+                not query or
+                query in faq["question"].lower() or
+                query in faq["answer"].lower()
             )
-            matches_cat = (active == "All"
-                           or faq["category"] == active)
+            matches_cat = (active == "All" or
+                           faq["category"] == active)
             visible = matches_query and matches_cat
             widget.setVisible(visible)
             if visible:
@@ -495,3 +501,6 @@ class FAQPage(QWidget):
         total_visible = sum(visible_per_cat.values())
         self.lbl_no_results.setVisible(total_visible == 0)
         self.scroll.setVisible(total_visible > 0)
+
+
+faqData = FAQ_DATA  # noqa: N816

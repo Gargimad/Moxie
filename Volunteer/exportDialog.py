@@ -7,13 +7,28 @@ clean record for NHS, honor societies, or award applications.
 import csv
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QRectF, QDate, QMarginsF
+from PyQt6.QtCore import QDate, QMarginsF, QRectF, Qt
 from PyQt6.QtGui import (
-    QColor, QFont, QFontMetricsF, QPainter, QPageLayout, QPageSize, QPdfWriter,
+    QColor,
+    QFont,
+    QFontMetricsF,
+    QPageLayout,
+    QPageSize,
+    QPainter,
+    QPdfWriter,
 )
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
-    QDateEdit, QMessageBox, QFileDialog, QFrame, QCheckBox,
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
+    QDialog,
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
 )
 
 import Events.theme as theme
@@ -26,13 +41,13 @@ class ExportDialog(QDialog):
         ("bookmarks", "Bookmarked events"),
     ]
 
-    def __init__(self, db, userID, parent=None):
+    def __init__(self, db, user_id, parent=None):
         super().__init__(parent)
         self.setObjectName(theme.EXPORT_DIALOG)
         self.setWindowTitle("Export my Moxie data")
         self.setMinimumWidth(460)
         self.db = db
-        self.userID = userID
+        self.user_id = user_id
 
         v = QVBoxLayout(self)
         v.setContentsMargins(28, 24, 28, 24)
@@ -156,7 +171,7 @@ class ExportDialog(QDialog):
             only_verified = self.verified_only.isChecked()
             headers = ["Date", "Event", "Organization", "Hours", "Verified"]
             rows = []
-            signups = self.db.getSignupsForVolunteer(self.userID) or []
+            signups = self.db.get_signups_for_volunteer(self.user_id) or []
             for r in signups:
                 d = str(r["event_date"] or "")[:10]
                 if not d or d < d_from or d > d_to:
@@ -177,7 +192,7 @@ class ExportDialog(QDialog):
         if ds == "registrations":
             headers = ["Signup date", "Event", "Event date", "Org", "Status"]
             rows = []
-            signups = self.db.getSignupsForVolunteer(self.userID) or []
+            signups = self.db.get_signups_for_volunteer(self.user_id) or []
             for r in signups:
                 sd = str(r["signup_time"] or "")[:10]
                 if sd and (sd < d_from or sd > d_to):
@@ -193,9 +208,9 @@ class ExportDialog(QDialog):
 
         headers = ["Bookmarked at", "Event", "Event date", "Org", "Clusters"]
         rows = []
-        marks = self.db.getBookmarkedOpportunities(self.userID) or []
+        marks = self.db.get_bookmarked_opportunities(self.user_id) or []
         for r in marks:
-            clusters = self.db.getOpportunityClusters(
+            clusters = self.db.get_opportunity_clusters(
                 r["opportunityID"]
             ) or []
             rows.append([
@@ -244,9 +259,9 @@ class ExportDialog(QDialog):
             painter.setFont(body_font)
             metrics = QFontMetricsF(body_font)
             cell_flags = (
-                Qt.AlignmentFlag.AlignLeft
-                | Qt.AlignmentFlag.AlignVCenter
-                | Qt.TextFlag.TextWordWrap
+                Qt.AlignmentFlag.AlignLeft |
+                Qt.AlignmentFlag.AlignVCenter |
+                Qt.TextFlag.TextWordWrap
             )
             padding = 10
             table_widths = {
@@ -278,8 +293,8 @@ class ExportDialog(QDialog):
                 for header, width in zip(headers, column_widths):
                     painter.drawText(
                         QRectF(x + padding, y, width - 2 * padding, 38),
-                        Qt.AlignmentFlag.AlignLeft
-                        | Qt.AlignmentFlag.AlignVCenter,
+                        Qt.AlignmentFlag.AlignLeft |
+                        Qt.AlignmentFlag.AlignVCenter,
                         str(header),
                     )
                     x += width
@@ -296,8 +311,8 @@ class ExportDialog(QDialog):
                 painter.setPen(QColor("#6B5B77"))
                 painter.drawText(
                     QRectF(left, footer_y + 5, content_width / 2, 24),
-                    Qt.AlignmentFlag.AlignLeft
-                    | Qt.AlignmentFlag.AlignVCenter,
+                    Qt.AlignmentFlag.AlignLeft |
+                    Qt.AlignmentFlag.AlignVCenter,
                     "Moxie volunteer impact record",
                 )
                 painter.drawText(
@@ -305,8 +320,8 @@ class ExportDialog(QDialog):
                         left + content_width / 2, footer_y + 5,
                         content_width / 2, 24,
                     ),
-                    Qt.AlignmentFlag.AlignRight
-                    | Qt.AlignmentFlag.AlignVCenter,
+                    Qt.AlignmentFlag.AlignRight |
+                    Qt.AlignmentFlag.AlignVCenter,
                     f"Page {page_number}",
                 )
 
@@ -324,9 +339,10 @@ class ExportDialog(QDialog):
                 heading_height = 42 if first_page else 30
                 heading_text = title if first_page else f"{title} (continued)"
                 painter.drawText(
-                    QRectF(left + 18, heading_y, content_width - 18, heading_height),
-                    Qt.AlignmentFlag.AlignLeft
-                    | Qt.AlignmentFlag.AlignVCenter,
+                    QRectF(left + 18, heading_y,
+                           content_width - 18, heading_height),
+                    Qt.AlignmentFlag.AlignLeft |
+                    Qt.AlignmentFlag.AlignVCenter,
                     heading_text,
                 )
                 if first_page:
@@ -334,8 +350,8 @@ class ExportDialog(QDialog):
                     painter.setPen(QColor("#6B5B77"))
                     painter.drawText(
                         QRectF(left + 18, top + 53, content_width - 18, 24),
-                        Qt.AlignmentFlag.AlignLeft
-                        | Qt.AlignmentFlag.AlignVCenter,
+                        Qt.AlignmentFlag.AlignLeft |
+                        Qt.AlignmentFlag.AlignVCenter,
                         f"Generated {generated}",
                     )
                     summary = f"{len(rows)} records"
@@ -362,8 +378,8 @@ class ExportDialog(QDialog):
                             left + padding, summary_y,
                             content_width - 2 * padding, 38,
                         ),
-                        Qt.AlignmentFlag.AlignLeft
-                        | Qt.AlignmentFlag.AlignVCenter,
+                        Qt.AlignmentFlag.AlignLeft |
+                        Qt.AlignmentFlag.AlignVCenter,
                         summary,
                     )
                     return summary_y + 52

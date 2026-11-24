@@ -6,11 +6,20 @@ Views:   hours by volunteer, hours by opportunity, hours by month.
 Output:  on-screen table + CSV export.
 """
 
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
-    QDateEdit, QFrame, QScrollArea, QMessageBox, QFileDialog,
+    QComboBox,
+    QDateEdit,
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -218,8 +227,8 @@ class OrgReportsPage(QWidget):
         ) or []
         capped_opportunities = [
             row for row in opportunities
-            if row["capacity"]
-            and (row["status"] or "").lower() != "cancelled"
+            if row["capacity"] and
+            (row["status"] or "").lower() != "cancelled"
         ]
         capacity = sum(int(row["capacity"]) for row in capped_opportunities)
         signups = sum(

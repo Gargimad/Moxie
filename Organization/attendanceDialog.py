@@ -4,8 +4,17 @@ import sqlite3
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QCheckBox, QDialog, QDoubleSpinBox, QHBoxLayout, QHeaderView, QLabel,
-    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QCheckBox,
+    QDialog,
+    QDoubleSpinBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -37,7 +46,8 @@ class AttendanceDialog(QDialog):
             QHeaderView.ResizeMode.Stretch
         )
         layout.addWidget(self.table)
-        self.empty_label = QLabel("No volunteers are registered for this event.")
+        self.empty_label = QLabel(
+            "No volunteers are registered for this event.")
         self.empty_label.setObjectName(theme.VOLUNTEER_EMPTY)
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.empty_label)
@@ -50,7 +60,7 @@ class AttendanceDialog(QDialog):
 
     def _refresh(self):
         try:
-            rows = self.db.getSignupsForOpportunityDetailed(
+            rows = self.db.get_signups_for_opportunity_detailed(
                 self.opportunity["opportunityID"]
             )
         except sqlite3.Error as exc:
@@ -154,20 +164,24 @@ class AttendanceDialog(QDialog):
         return True
 
     def _check_in(self, user_id):
-        self._run(self.db.checkIn, user_id, self.opportunity["opportunityID"])
+        self._run(self.db.check_in, user_id, self.opportunity["opportunityID"])
 
     def _check_out(self, user_id):
-        self._run(self.db.checkOut, user_id, self.opportunity["opportunityID"])
+        self._run(
+            self.db.check_out,
+            user_id,
+            self.opportunity["opportunityID"],
+        )
 
     def _verify(self, signup_id, hours):
         try:
             verified_by = self.org["userID"]
         except (KeyError, IndexError, TypeError):
             verified_by = None
-        self._run(self.db.verifySignupHours, signup_id, verified_by, hours)
+        self._run(self.db.verify_signup_hours, signup_id, verified_by, hours)
 
     def _unverify(self, signup_id):
-        self._run(self.db.unverifySignup, signup_id)
+        self._run(self.db.unverify_signup, signup_id)
 
     def _set_no_show(self, signup_id, no_show, verified):
         if no_show and verified:
@@ -178,4 +192,4 @@ class AttendanceDialog(QDialog):
                 "as a no-show.",
             )
             return
-        self._run(self.db.setSignupNoShow, signup_id, no_show)
+        self._run(self.db.set_signup_no_show, signup_id, no_show)

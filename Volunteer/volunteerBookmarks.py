@@ -29,11 +29,11 @@ class VolunteerBookmarks:
 
     def _refresh_bookmarks(self):
         self._clear(self.bookmarks_layout)
-        if not (self.db and self.userID):
+        if not (self.db and self.user_id):
             return
 
         rows = self._db(
-            "getBookmarkedOpportunities", self.userID, default=[]
+            "getBookmarkedOpportunities", self.user_id, default=[]
         ) or []
         self._bookmarked_ids = {r["opportunityID"] for r in rows}
 
@@ -53,15 +53,15 @@ class VolunteerBookmarks:
     def _make_bookmark_card(self, row):
         card = EventCard(
             row, view_mode="list",
-            current_volunteer_id=self.userID,
+            current_volunteer_id=self.user_id,
             bookmarked_ids=self._bookmarked_ids,
         )
         card.set_bookmark_callback(self._on_bookmark_toggled)
-        card.detailsRequested.connect(
+        card.details_requested.connect(
             lambda c, _p=self: EventDetailsDialog(c, self).exec()
         )
         return card
 
-    def _on_bookmark_toggled(self, opportunityID, is_bookmarked):
+    def _on_bookmark_toggled(self, opportunity_id, is_bookmarked):
         if not is_bookmarked:
             self._refresh_bookmarks()

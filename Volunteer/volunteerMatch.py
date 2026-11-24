@@ -11,8 +11,17 @@ every event in the app looks the same.
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
-    QScrollArea, QComboBox, QButtonGroup, QMessageBox, QStackedWidget,
+    QButtonGroup,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -21,20 +30,23 @@ from Events.dateFormat import format_event_when
 from Events.eventCard import EventCard
 from Events.eventDetailsDialog import EventDetailsDialog
 from Events.gaLocations import (
-    GA_CITIES, ALL_CITIES, ALL_SCHOOLS, schools_for_city,
+    ALL_CITIES,
+    ALL_SCHOOLS,
+    ga_cities,
+    schools_for_city,
 )
 
 
 class VolunteerMatch(QWidget):
     """Standalone page — landing.py pushes this onto the stack."""
 
-    browseAllRequested = pyqtSignal()
+    browse_all_requested = pyqtSignal()
 
     def __init__(self, db, parent=None):
         super().__init__(parent)
         self.setObjectName(theme.MATCH_PAGE)
         self.db = db
-        self.userID = None
+        self.user_id = None
         self._selected_clusters = []
         self._bookmarked_ids = set()
 
@@ -81,7 +93,7 @@ class VolunteerMatch(QWidget):
         cl.addWidget(QLabel("Georgia city"))
         self.city_combo = QComboBox()
         self.city_combo.addItem(ALL_CITIES)
-        for c in GA_CITIES:
+        for c in ga_cities:
             self.city_combo.addItem(c)
         self.city_combo.currentTextChanged.connect(
             self._on_city_changed
@@ -227,24 +239,24 @@ class VolunteerMatch(QWidget):
         row.addStretch(1)
         browse = QPushButton("Browse all events")
         browse.setObjectName(theme.SECONDARY_BTN)
-        browse.clicked.connect(self.browseAllRequested.emit)
+        browse.clicked.connect(self.browse_all_requested.emit)
         row.addWidget(browse)
         v.addLayout(row)
         return page
 
     # ── Matching ──────────────────────────────────────────────────────
-    def set_volunteer(self, userID):
-        self.userID = userID
-        if userID:
+    def set_volunteer(self, user_id):
+        self.user_id = user_id
+        if user_id:
             try:
                 self._bookmarked_ids = (
-                    self.db.getBookmarkedIDs(userID) or set()
+                    self.db.get_bookmarked_ids(user_id) or set()
                 )
             except Exception:
                 self._bookmarked_ids = set()
 
     def _run_match(self):
-        if self.userID is None:
+        if self.user_id is None:
             QMessageBox.information(
                 self, "Log in required",
                 "Log in as a volunteer to save your match preferences.",
@@ -256,8 +268,8 @@ class VolunteerMatch(QWidget):
         city = self.city_combo.currentText()
         school = self.school_combo.currentText()
 
-        self.db.saveVolunteerMatch(
-            self.userID,
+        self.db.save_volunteer_match(
+            self.user_id,
             location=city if city != ALL_CITIES else "",
             city=city if city != ALL_CITIES else "",
             high_school=school if school != ALL_SCHOOLS else "",
@@ -275,13 +287,13 @@ class VolunteerMatch(QWidget):
 
     def _score_opportunities(self, city, school, clusters):
         cluster_set = set(clusters)
-        rows = self.db.getAllOpportunities(limit=1000) or []
+        rows = self.db.get_all_opportunities(limit=1000) or []
         scored = []
 
         for r in rows:
             opp_clusters = set(
-                self.db.getOpportunityClusters(r["opportunityID"])
-                or []
+                self.db.get_opportunity_clusters(r["opportunityID"]) or
+                []
             )
             overlap = len(cluster_set & opp_clusters)
             if overlap == 0:
@@ -326,10 +338,10 @@ class VolunteerMatch(QWidget):
             return
 
         # Refresh bookmarked set for the cards.
-        if self.userID:
+        if self.user_id:
             try:
                 self._bookmarked_ids = (
-                    self.db.getBookmarkedIDs(self.userID) or set()
+                    self.db.get_bookmarked_ids(self.user_id) or set()
                 )
             except Exception:
                 self._bookmarked_ids = set()
@@ -339,43 +351,43 @@ class VolunteerMatch(QWidget):
         for score, r in scored:
             card = EventCard(
                 r, view_mode="list",
-                current_volunteer_id=self.userID,
+                current_volunteer_id=self.user_id,
                 bookmarked_ids=self._bookmarked_ids,
             )
             card.set_bookmark_callback(self._on_bookmark_toggled)
-            card.detailsRequested.connect(self._show_details)
-            card.rsvpRequested.connect(self._handle_rsvp)
+            card.details_requested.connect(self._show_details)
+            card.rsvp_requested.connect(self._handle_rsvp)
             self.results_layout.insertWidget(
                 self.results_layout.count() - 1, card
             )
 
     # ── Card callbacks ────────────────────────────────────────────────
-    def _on_bookmark_toggled(self, opportunityID, is_bookmarked):
-        if not self.userID:
+    def _on_bookmark_toggled(self, opportunity_id, is_bookmarked):
+        if not self.user_id:
             return
-        result = self.db.toggleBookmark(self.userID, opportunityID)
+        result = self.db.toggle_bookmark(self.user_id, opportunity_id)
         if result == "added":
-            self._bookmarked_ids.add(opportunityID)
+            self._bookmarked_ids.add(opportunity_id)
         elif result == "removed":
-            self._bookmarked_ids.discard(opportunityID)
+            self._bookmarked_ids.discard(opportunity_id)
 
     def _show_details(self, card):
         EventDetailsDialog(card, self).exec()
 
-    def _handle_rsvp(self, opportunityID):
-        if not self.userID:
+    def _handle_rsvp(self, opportunity_id):
+        if not self.user_id:
             return
-        result = self.db.registerForOpportunity(
-            self.userID, opportunityID
+        result = self.db.register_for_opportunity(
+            self.user_id, opportunity_id
         )
         if result == "ok":
             try:
-                row = self.db.getOpportunityByID(opportunityID)
+                row = self.db.get_opportunity_by_id(opportunity_id)
                 title = row["title"] if row else "an event"
-                self.db.addNotification(
-                    self.userID,
+                self.db.add_notification(
+                    self.user_id,
                     f"You signed up for {title}.",
-                    "rsvp", opportunityID,
+                    "rsvp", opportunity_id,
                 )
             except Exception:
                 pass
@@ -397,3 +409,4 @@ class VolunteerMatch(QWidget):
             QMessageBox.warning(
                 self, "Error", "Could not complete RSVP."
             )
+    browseAllRequested = property(lambda self: self.browse_all_requested)  # noqa: N815

@@ -10,21 +10,28 @@ Signals:
   loginRequested — a guest tried to interact but isn't logged in.
                    landing.py should route to the login page.
 """
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+# ── Color helper (kept local to avoid a heavy import chain) ───────────
+import zlib
+
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QFrame, QLineEdit, QComboBox, QMessageBox,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
 from Events.careerClusters import CAREER_CLUSTERS
-from Events.gaLocations import GA_CITIES, ALL_CITIES
+from Events.gaLocations import ALL_CITIES, ga_cities
 from Events.multiSelectCauses import MultiSelectCauses
-
-
-# ── Color helper (kept local to avoid a heavy import chain) ───────────
-import zlib
 
 _ORG_PALETTE = [
     "#2E86DE", "#E67E22", "#27AE60", "#C0392B", "#8E44AD",
@@ -42,7 +49,7 @@ def _org_color(name):
 
 
 class OrgBrowsePage(QWidget):
-    loginRequested = pyqtSignal()
+    login_requested = pyqtSignal()
 
     def __init__(self, db, on_back_click=None, parent=None):
         super().__init__(parent)
@@ -104,7 +111,7 @@ class OrgBrowsePage(QWidget):
         self.city_combo = QComboBox()
         self.city_combo.setObjectName(theme.FILTER_COMBO)
         self.city_combo.addItem(ALL_CITIES)
-        for c in GA_CITIES:
+        for c in ga_cities:
             self.city_combo.addItem(c)
         layout.addWidget(self.city_combo, 1)
 
@@ -130,7 +137,7 @@ class OrgBrowsePage(QWidget):
             lambda _t: self._debounce.start()
         )
         self.city_combo.currentTextChanged.connect(self.refresh)
-        self.causes_multi.selectionChanged.connect(
+        self.causes_multi.selection_changed.connect(
             lambda _items: self.refresh()
         )
 
@@ -197,7 +204,7 @@ class OrgBrowsePage(QWidget):
         self._joined_ids = set()
         if volunteer_id:
             try:
-                rows = self.db.getOrganizations(volunteer_id) or []
+                rows = self.db.get_organizations(volunteer_id) or []
                 self._joined_ids = {
                     r["organizationID"] for r in rows
                     if r["is_member"]
@@ -223,7 +230,7 @@ class OrgBrowsePage(QWidget):
         clusters = self.causes_multi.checked_items()
 
         try:
-            rows = self.db.searchOrganizations(
+            rows = self.db.search_organizations(
                 keyword=keyword,
                 city=city,
                 cluster_list=clusters,
@@ -316,7 +323,7 @@ class OrgBrowsePage(QWidget):
             lay.addWidget(desc)
 
         # Clusters shown as causes
-        clusters = self.db.getOrganizationClusters(org_id) or []
+        clusters = self.db.get_organization_clusters(org_id) or []
         if clusters:
             cl = QLabel(" · ".join(clusters))
             cl.setObjectName(theme.EVENT_META_VALUE)
@@ -354,9 +361,9 @@ class OrgBrowsePage(QWidget):
     # ── Actions ───────────────────────────────────────────────────────
     def _on_join(self, org_id):
         if not self.current_volunteer_id:
-            self.loginRequested.emit()
+            self.login_requested.emit()
             return
-        if not self.db.joinOrganization(
+        if not self.db.join_organization(
                 self.current_volunteer_id, org_id):
             QMessageBox.warning(
                 self, "Join failed",
@@ -364,7 +371,7 @@ class OrgBrowsePage(QWidget):
             )
             return
         try:
-            self.db.addNotification(
+            self.db.add_notification(
                 self.current_volunteer_id,
                 "You joined a new organization.",
                 "join_org", None,
@@ -373,3 +380,4 @@ class OrgBrowsePage(QWidget):
             pass
         self._joined_ids.add(org_id)
         self._render()
+    loginRequested = property(lambda self: self.login_requested)  # noqa: N815

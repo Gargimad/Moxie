@@ -5,14 +5,14 @@ or more career clusters (shown to volunteers as "Causes").
 Emits selectionChanged(list_of_names) whenever the checked set changes.
 """
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QCursor, QAction
-from PyQt6.QtWidgets import QPushButton, QMenu
+from PyQt6.QtGui import QAction, QCursor
+from PyQt6.QtWidgets import QMenu, QPushButton
 
 import Events.theme as theme
 
 
 class MultiSelectCauses(QPushButton):
-    selectionChanged = pyqtSignal(list)
+    selection_changed = pyqtSignal(list)
 
     def __init__(self, placeholder="All Causes", parent=None):
         super().__init__(parent)
@@ -62,4 +62,5 @@ class MultiSelectCauses(QPushButton):
             self.setText(f"{checked[0]}  ▾")
         else:
             self.setText(f"{len(checked)} causes  ▾")
-        self.selectionChanged.emit(checked)
+        self.selection_changed.emit(checked)
+    selectionChanged = property(lambda self: self.selection_changed)  # noqa: N815

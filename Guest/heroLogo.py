@@ -30,7 +30,7 @@ class HeroLogo(QLabel):
         self._source = pixmap
         self._rescale()
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         self._rescale()
 

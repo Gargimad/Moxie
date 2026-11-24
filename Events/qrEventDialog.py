@@ -15,12 +15,16 @@ from datetime import datetime
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QCursor, QPixmap
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
     QMessageBox,
+    QPushButton,
+    QVBoxLayout,
 )
 
 import Events.theme as theme
-from Events.dateFormat import format_time, format_date
+from Events.dateFormat import format_date, format_time
 
 try:
     import qrcode

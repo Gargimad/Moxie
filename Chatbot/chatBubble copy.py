@@ -20,15 +20,21 @@ view.on_reply() / view.on_error().
 """
 
 import json
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
-    QScrollArea, QLineEdit, QSizePolicy,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
-
 
 # Emoji icons. Each is a single codepoint (no variation selector), which
 # renders at full width on Windows instead of a thin, narrow glyph.
@@ -173,9 +179,9 @@ class ChatView(QWidget):
             return []
         return [
             e for e in data
-            if isinstance(e, dict)
-            and e.get("role") in ("user", "assistant")
-            and isinstance(e.get("content"), str)
+            if isinstance(e, dict) and
+            e.get("role") in ("user", "assistant") and
+            isinstance(e.get("content"), str)
         ]
 
     def _write_saved(self):
@@ -335,7 +341,8 @@ class ChatView(QWidget):
             f"  border-radius: {size // 2}px;"
             f"  padding: 0px;"
             f"  margin: 0px;"
-            f"  font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji';"
+            f"  font-family: 'Segoe UI Emoji', 'Apple Color Emoji', "
+            f"'Noto Color Emoji';"
             f"  font-size: {font_px}px;"
             f"}}"
             f"QPushButton:hover {{ background-color: {ICON_HOVER_BG}; }}"

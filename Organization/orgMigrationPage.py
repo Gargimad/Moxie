@@ -3,20 +3,35 @@
 import csv
 import posixpath
 import re
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 from datetime import date, timedelta
 
-from PyQt6.QtCore import QThread, pyqtSignal, Qt
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit,
-    QTextEdit, QPushButton, QFrame, QScrollArea, QFileDialog, QMessageBox,
-    QTableWidget, QTableWidgetItem, QDialog, QHeaderView,
+    QDialog,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
-from Authentication.otp import generate_activation_code, send_volunteer_activation_email
-
+from Authentication.otp import (
+    generate_activation_code,
+    send_volunteer_activation_email,
+)
 
 PROFILE_FIELDS = (
     "first_name", "last_name", "country", "zipcode", "dob", "gender",
@@ -71,7 +86,9 @@ ALIASES = {
 }
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 XLSX_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-DOC_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+DOC_REL_NS = (
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+)
 PKG_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 
 
@@ -186,12 +203,18 @@ def read_roster_file(path):
                 record["dob"] = (
                     date(1899, 12, 30) + timedelta(days=int(serial))
                 ).isoformat()
-        if not any(record.get(field) for field in IMPORT_FIELDS + ORG_IMPORT_FIELDS):
+        if not any(
+            record.get(field)
+            for field in IMPORT_FIELDS + ORG_IMPORT_FIELDS
+        ):
             continue
         record.setdefault("email", "")
         email = record["email"].strip().lower()
         record["email"] = email
-        if not email and not any(record.get(field) for field in PROFILE_FIELDS):
+        if not email and not any(
+            record.get(field)
+            for field in PROFILE_FIELDS
+        ):
             continue
         issue = ""
         if not EMAIL_RE.match(email):
@@ -269,7 +292,7 @@ class VolunteerEditDialog(QDialog):
     def _save(self):
         fields = {key: widget.text().strip()
                   for key, widget in self.fields.items()}
-        if not self.db.updateImportedVolunteerProfile(
+        if not self.db.update_imported_volunteer_profile(
                 self.org_id, self.volunteer["userID"], fields):
             QMessageBox.warning(
                 self, "Save failed",
@@ -454,7 +477,7 @@ class OrgMigrationPage(QWidget):
     def refresh(self):
         if not self.org:
             return
-        self._members = self.db.getMigratedVolunteers(self.org["orgID"])
+        self._members = self.db.get_migrated_volunteers(self.org["orgID"])
         self.roster.setRowCount(len(self._members))
         for index, volunteer in enumerate(self._members):
             name = " ".join(
@@ -484,7 +507,7 @@ class OrgMigrationPage(QWidget):
                 "Enter an organization name before saving."
             )
             return
-        if not self.db.updateOrganizationProfile(
+        if not self.db.update_organization_profile(
                 self.org["userID"], self.org["orgID"], fields):
             QMessageBox.warning(
                 self, "Save failed",
@@ -589,7 +612,7 @@ class OrgMigrationPage(QWidget):
             records.append(record)
             codes[record["email"]] = code
 
-        result = self.db.importVolunteerRoster(self.org["orgID"], records)
+        result = self.db.import_volunteer_roster(self.org["orgID"], records)
         if result is None:
             QMessageBox.critical(
                 self, "Import failed",
@@ -607,7 +630,7 @@ class OrgMigrationPage(QWidget):
                 else self.org_fields[ORG_FIELD_TO_PROFILE[key]].text().strip()
                 for key in self._pending_org_import
             }
-            if self.db.updateOrganizationProfile(
+            if self.db.update_organization_profile(
                     self.org["userID"], self.org["orgID"], org_profile):
                 self.org.update(org_profile)
             else:
@@ -618,17 +641,17 @@ class OrgMigrationPage(QWidget):
         if invites:
             self.import_status.setText(
                 f"Created {len(imported)}; skipped {len(result['skipped'])}. "
-                "Sending invitations…"
-                + (" Organization details could not be saved."
-                   if org_update_failed else "")
+                "Sending invitations…" +
+                (" Organization details could not be saved."
+                 if org_update_failed else "")
             )
             self._start_invites(invites)
         else:
             self.import_status.setText(
                 f"Created 0; skipped {len(result['skipped'])}. "
-                "No new accounts needed invitations."
-                + (" Organization details could not be saved."
-                   if org_update_failed else "")
+                "No new accounts needed invitations." +
+                (" Organization details could not be saved."
+                 if org_update_failed else "")
             )
             self.import_btn.setEnabled(bool(self._preview_rows))
         self.refresh()
@@ -699,7 +722,7 @@ class OrgMigrationPage(QWidget):
             )
             return
         code = generate_activation_code()
-        if not self.db.setVolunteerActivationCode(
+        if not self.db.set_volunteer_activation_code(
                 self.org["orgID"], volunteer["userID"], code):
             QMessageBox.warning(
                 self, "Invitation unavailable",

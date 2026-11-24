@@ -2,21 +2,30 @@
 filterSidebar.py — Vertical filter panel on the left of the events
 listing. Sections: Search, Location, Format, Causes, When.
 """
-from PyQt6.QtCore import Qt, QTimer, QDate, pyqtSignal
+from PyQt6.QtCore import QDate, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QLineEdit, QComboBox, QPushButton,
-    QDateEdit, QScrollArea, QFrame, QCheckBox, QButtonGroup,
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
+    QFrame,
+    QLabel,
+    QLineEdit,
+    QPushButton,
     QRadioButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
 from Events.careerClusters import CAREER_CLUSTERS
-from Events.gaLocations import GA_CITIES, ALL_CITIES
+from Events.gaLocations import ALL_CITIES, ga_cities
 
 
 class FilterSidebar(QWidget):
-    filtersChanged = pyqtSignal(dict)
+    filters_changed = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -53,7 +62,7 @@ class FilterSidebar(QWidget):
         self.city_combo = QComboBox()
         self.city_combo.setObjectName(theme.FILTER_SIDEBAR_INPUT)
         self.city_combo.addItem(ALL_CITIES)
-        for c in GA_CITIES:
+        for c in ga_cities:
             self.city_combo.addItem(c)
         body.addWidget(self.city_combo)
 
@@ -193,7 +202,7 @@ class FilterSidebar(QWidget):
     # ── Emit ──────────────────────────────────────────────────────────
     def _emit(self, *_args):
         enabled, d_from, d_to = self._date_range()
-        self.filtersChanged.emit({
+        self.filters_changed.emit({
             "keyword": self.search_input.text().strip(),
             "type": self._format(),
             "location": "",
@@ -245,3 +254,4 @@ class FilterSidebar(QWidget):
             cb.setChecked(name in cluster_names)
             cb.blockSignals(False)
         self._emit()
+    filtersChanged = property(lambda self: self.filters_changed)  # noqa: N815

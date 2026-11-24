@@ -1,7 +1,7 @@
 """clusterSelector.py — reusable multi-select for career clusters."""
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
-from PyQt6.QtWidgets import QWidget, QGridLayout, QPushButton
+from PyQt6.QtWidgets import QGridLayout, QPushButton, QWidget
 
 import Events.theme as theme
 from Events.careerClusters import CAREER_CLUSTERS

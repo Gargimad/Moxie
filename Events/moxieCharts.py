@@ -5,13 +5,23 @@ All widgets are QWidget subclasses that draw themselves with QPainter.
 No external dependencies. Colors follow the theme palette via
 QPalette, so charts re-tint automatically when light / dark toggles.
 """
-from PyQt6.QtCore import Qt, QRectF, QPointF
+from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import (
-    QColor, QPainter, QPainterPath, QPen, QBrush, QLinearGradient,
-    QFont, QPalette,
+    QBrush,
+    QColor,
+    QFont,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPalette,
+    QPen,
 )
 from PyQt6.QtWidgets import (
-    QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QVBoxLayout,
+    QWidget,
 )
 
 
@@ -117,7 +127,7 @@ class HBarChart(QWidget):
         self.setMinimumHeight(max(120, len(rows) * self._row_h + 16))
         self.update()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event):  # noqa: N802
         if not self.rows:
             return
         p = QPainter(self)
@@ -129,7 +139,9 @@ class HBarChart(QWidget):
         bar_w = max(20, w - label_w - value_w - 20)
         max_v = max((v for _, v in self.rows), default=1) or 1
 
-        f = QFont(); f.setPointSize(9); p.setFont(f)
+        f = QFont()
+        f.setPointSize(9)
+        p.setFont(f)
         y = 6
         for i, (label, value) in enumerate(self.rows):
             colour = cols["series"][i % len(cols["series"])]
@@ -139,7 +151,8 @@ class HBarChart(QWidget):
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                 str(label),
             )
-            p.setBrush(cols["grid"]); p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(cols["grid"])
+            p.setPen(Qt.PenStyle.NoPen)
             p.drawRect(label_w, y + 10, bar_w, self._row_h - 20)
             p.setBrush(colour)
             p.drawRect(label_w, y + 10,
@@ -167,7 +180,7 @@ class VBarChart(QWidget):
         self.points = points
         self.update()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event):  # noqa: N802
         if not self.points:
             return
         p = QPainter(self)
@@ -194,10 +207,13 @@ class VBarChart(QWidget):
             x = plot.left() + slot * i + (slot - bar_w) / 2
             y = plot.bottom() - bh
             colour = cols["series"][i % len(cols["series"])]
-            p.setBrush(colour); p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(colour)
+            p.setPen(Qt.PenStyle.NoPen)
             p.drawRect(QRectF(x, y, bar_w, bh))
 
-        f = QFont(); f.setPointSize(8); p.setFont(f)
+        f = QFont()
+        f.setPointSize(8)
+        p.setFont(f)
         p.setPen(cols["subtext"])
         for i, (label, _) in enumerate(self.points):
             x = plot.left() + slot * i
@@ -221,7 +237,7 @@ class AreaChart(QWidget):
         self.points = points
         self.update()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event):  # noqa: N802
         if not self.points:
             return
         p = QPainter(self)
@@ -260,23 +276,31 @@ class AreaChart(QWidget):
         fill.closeSubpath()
 
         grad = QLinearGradient(0, plot.top(), 0, plot.bottom())
-        c1 = QColor(cols["accent"]); c1.setAlpha(150)
-        c2 = QColor(cols["accent"]); c2.setAlpha(0)
-        grad.setColorAt(0, c1); grad.setColorAt(1, c2)
-        p.setBrush(QBrush(grad)); p.setPen(Qt.PenStyle.NoPen)
+        c1 = QColor(cols["accent"])
+        c1.setAlpha(150)
+        c2 = QColor(cols["accent"])
+        c2.setAlpha(0)
+        grad.setColorAt(0, c1)
+        grad.setColorAt(1, c2)
+        p.setBrush(QBrush(grad))
+        p.setPen(Qt.PenStyle.NoPen)
         p.drawPath(fill)
 
         pen = QPen(cols["accent"], 3)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawPath(path)
 
-        p.setBrush(cols["brand"]); p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(cols["brand"])
+        p.setPen(Qt.PenStyle.NoPen)
         for pt in pts:
             p.drawEllipse(pt, 3.5, 3.5)
 
-        f = QFont(); f.setPointSize(8); p.setFont(f)
+        f = QFont()
+        f.setPointSize(8)
+        p.setFont(f)
         p.setPen(cols["subtext"])
         for i, (label, _) in enumerate(self.points):
             x = plot.left() + plot.width() * (i / max(1, n - 1))
@@ -302,7 +326,7 @@ class DonutChart(QWidget):
         self.center_label = center_label
         self.update()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event):  # noqa: N802
         if not self.slices:
             return
         p = QPainter(self)
@@ -323,7 +347,8 @@ class DonutChart(QWidget):
         for i, (label, value) in enumerate(self.slices):
             span = -int(360 * 16 * (value / total))
             colour = cols["series"][i % len(cols["series"])]
-            p.setBrush(colour); p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(colour)
+            p.setPen(Qt.PenStyle.NoPen)
             p.drawPie(outer, start, span)
             start += span
 
@@ -332,17 +357,23 @@ class DonutChart(QWidget):
         p.drawEllipse(inner)
 
         if self.center_label:
-            f = QFont(); f.setPointSize(18); f.setBold(True)
-            p.setFont(f); p.setPen(cols["text"])
+            f = QFont()
+            f.setPointSize(18)
+            f.setBold(True)
+            p.setFont(f)
+            p.setPen(cols["text"])
             p.drawText(inner, Qt.AlignmentFlag.AlignCenter,
                        self.center_label)
 
-        f = QFont(); f.setPointSize(9); p.setFont(f)
+        f = QFont()
+        f.setPointSize(9)
+        p.setFont(f)
         legend_x = 30 + d + 26
         legend_y = (h - len(self.slices) * 24) / 2
         for i, (label, value) in enumerate(self.slices):
             colour = cols["series"][i % len(cols["series"])]
-            p.setBrush(colour); p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(colour)
+            p.setPen(Qt.PenStyle.NoPen)
             p.drawRect(QRectF(legend_x, legend_y + 4, 10, 10))
             p.setPen(cols["text"])
             pct = int(round(100 * value / total)) if total else 0

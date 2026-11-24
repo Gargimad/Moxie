@@ -13,17 +13,23 @@ This file only decides *which* object name to use.
 
 import hashlib
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 
-from PyQt6.QtCore import Qt, QByteArray, pyqtSignal, QRectF
-from PyQt6.QtGui import QPixmap, QCursor, QPainter, QPainterPath, QColor
+from PyQt6.QtCore import QByteArray, QRectF, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QCursor, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import (
-    QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
     QWidget,
 )
-from Events.dateFormat import format_event_when
+
 import Events.theme as theme
+from Events.dateFormat import format_event_when
 
 FALLBACK_IMAGE = theme.asset("noThumbnail.png")
 THUMB_CACHE_DIR = os.path.join(
@@ -207,9 +213,9 @@ def make_meta_row(key, value):
 
 
 class EventCard(QFrame):
-    openLinkRequested = pyqtSignal(str)
-    rsvpRequested = pyqtSignal(int)
-    detailsRequested = pyqtSignal(object)
+    open_link_requested = pyqtSignal(str)
+    rsvp_requested = pyqtSignal(int)
+    details_requested = pyqtSignal(object)
 
     GRID_WIDTH = 300
     GRID_THUMB_H = 150
@@ -244,7 +250,7 @@ class EventCard(QFrame):
         )
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
-        self.opportunityID = g("opportunityID", 0)
+        self.opportunity_id = g("opportunityID", 0)
         self.title = g("title", "Untitled event")
         self.description = g("description", "")
         self.category = g("category", "")
@@ -264,8 +270,8 @@ class EventCard(QFrame):
         except (TypeError, ValueError):
             self.registered_count = 0
 
-        if (self.status == "open" and self.capacity
-                and self.registered_count >= self.capacity):
+        if (self.status == "open" and self.capacity and
+                self.registered_count >= self.capacity):
             self.status = "full"
 
         if view_mode == "list":
@@ -291,7 +297,7 @@ class EventCard(QFrame):
 
         pixmap = load_thumbnail_pixmap(
             self.thumbnail, w, h,
-            key=self.opportunityID or None,
+            key=self.opportunity_id or None,
             radius=THUMB_RADIUS,
         )
         if pixmap is not None:
@@ -481,14 +487,17 @@ class EventCard(QFrame):
     # ── events ────────────────────────────────────────────────────────────
     def open_link(self):
         if self.website_link:
-            self.openLinkRequested.emit(self.website_link)
+            self.open_link_requested.emit(self.website_link)
 
     def request_rsvp(self):
-        if self.opportunityID:
-            self.rsvpRequested.emit(self.opportunityID)
+        if self.opportunity_id:
+            self.rsvp_requested.emit(self.opportunity_id)
 
-    def mouseReleaseEvent(self, event):
-        if (event.button() == Qt.MouseButton.LeftButton
-                and self.rect().contains(event.position().toPoint())):
-            self.detailsRequested.emit(self)
+    def mouseReleaseEvent(self, event):  # noqa: N802
+        if (event.button() == Qt.MouseButton.LeftButton and
+                self.rect().contains(event.position().toPoint())):
+            self.details_requested.emit(self)
         super().mouseReleaseEvent(event)
+    detailsRequested = property(lambda self: self.details_requested)  # noqa: N815
+    openLinkRequested = property(lambda self: self.open_link_requested)  # noqa: N815
+    rsvpRequested = property(lambda self: self.rsvp_requested)  # noqa: N815

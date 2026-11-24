@@ -8,29 +8,36 @@ bar, the guest search bar, and the global mic button.
 
 import webbrowser
 
-from PyQt6.QtCore import Qt, QSettings, QTimer
-from PyQt6.QtGui import QAction, QIcon, QPixmap, QCursor
+from PyQt6.QtCore import QSettings, Qt, QTimer
+from PyQt6.QtGui import QAction, QCursor, QIcon, QPixmap
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QMenu, QStackedWidget, QScrollArea,
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMenu,
     QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
+from Authentication.login import Login
 from db import Database
 from Events.searchBar import SearchBar
+from Guest.FAQ import FAQPage
 from Guest.featuresSection import FeaturesSection
+from Guest.globalMic import GlobalMicButton
 from Guest.heroSection import HeroSection
 from Guest.opportunitiesSection import OpportunitiesSection
-from Volunteer.volunteerRegister import VolunteerRegistration
-from Organization.orgRegister import OrganizationRegistration
-from Authentication.login import Login
-from Volunteer.volunteerHome import VolunteerHome, TAB_PROFILE
-from Guest.FAQ import FAQPage
-from Volunteer.volunteerPage import VolunteerPage
 from Organization.orgDashboard import OrgDashboard
-from Guest.globalMic import GlobalMicButton
-
+from Organization.orgRegister import OrganizationRegistration
+from Volunteer.volunteerHome import TAB_PROFILE, VolunteerHome
+from Volunteer.volunteerPage import VolunteerPage
+from Volunteer.volunteerRegister import VolunteerRegistration
 
 # Stack page indices
 PAGE_HOME = 0
@@ -47,43 +54,43 @@ NAV_GUEST, NAV_VOLUNTEER, NAV_ORG = "guest", "volunteer", "org"
 
 
 VOLUNTEER_NAV_GROUPS = [
-    ("Home",        [("Dashboard", "vol_tab", 0),
-                     ("Notifications", "vol_tab", 4)]),
-    ("Discover",    [("Browse Events", "vol_list", None),
-                     ("Volunteer Match", "vol_match", None),
-                     ("Bookmarks", "vol_tab", 7)]),
+    ("Home", [("Dashboard", "vol_tab", 0),
+              ("Notifications", "vol_tab", 4)]),
+    ("Discover", [("Browse Events", "vol_list", None),
+                  ("Volunteer Match", "vol_match", None),
+                  ("Bookmarks", "vol_tab", 7)]),
     ("My Activity", [("Calendar", "vol_tab", 1),
                      ("My Events", "vol_tab", 2),
                      ("Organizations", "vol_tab", 3)]),
-    ("Support",     [("Help", "vol_tab", 5),
-                     ("FAQ", "show_faq", None)]),
-    ("Account",     [("Profile", "vol_tab", 6),
-                     ("Export my data", "open_export", None),
-                     ("Log out", "handle_logout", None)]),
+    ("Support", [("Help", "vol_tab", 5),
+                 ("FAQ", "show_faq", None)]),
+    ("Account", [("Profile", "vol_tab", 6),
+                 ("Export my data", "open_export", None),
+                 ("Log out", "handle_logout", None)]),
 ]
 
 # NOTE: nav_idx 6 routes via NAV_TO_STACK[6] = TAB_RECOMMENDATIONS.
 # Label was previously "Check-in codes" (wrong); now "Recommendations".
 ORG_NAV_GROUPS = [
-    ("Home",          [("Overview", "org_nav", 0),
-                       ("Announcements", "org_nav", 4)]),
+    ("Home", [("Overview", "org_nav", 0),
+              ("Announcements", "org_nav", 4)]),
     ("Opportunities", [("My opportunities", "org_nav", 1),
                        ("Recommendations", "org_nav", 6)]),
-    ("People",        [("Volunteers", "org_nav", 2),
-                       ("Reports", "org_nav", 3)]),
-    ("Data",          [("Data migration", "org_nav", 5)]),
-    ("Account",       [("Help", "show_faq", None),
-                       ("Log out", "handle_org_logout", None)]),
+    ("People", [("Volunteers", "org_nav", 2),
+                ("Reports", "org_nav", 3)]),
+    ("Data", [("Data migration", "org_nav", 5)]),
+    ("Account", [("Help", "show_faq", None),
+                 ("Log out", "handle_org_logout", None)]),
 ]
 
 GUEST_NAV_GROUPS = [
-    ("Discover",   [("Browse Volunteer Events", "vol_list", None),
-                    ("Volunteer Match", "vol_match", None)]),
-    ("Learn",      [("FAQ", "show_faq", None)]),
-    ("Account",    [("Login", "show_login", None),
-                    ("Register as Volunteer",
+    ("Discover", [("Browse Volunteer Events", "vol_list", None),
+                  ("Volunteer Match", "vol_match", None)]),
+    ("Learn", [("FAQ", "show_faq", None)]),
+    ("Account", [("Login", "show_login", None),
+                 ("Register as Volunteer",
                      "show_vol_register", None),
-                    ("Register an Organization",
+                 ("Register an Organization",
                      "show_org_register", None)]),
     ("Appearance", [("Toggle dark / light mode", "toggle_theme", None)]),
 ]
@@ -140,14 +147,14 @@ class Landing(QMainWindow):
 
         layout.addWidget(self._build_nav(), 0)
 
-        self.searchBar = SearchBar()
+        self.SEARCH_BAR = SearchBar()
         try:
-            self.searchBar.populate_categories(
-                self.db.getDistinctCategories()
+            self.SEARCH_BAR.populate_categories(
+                self.db.get_distinct_categories()
             )
         except Exception as e:
             print("Could not load categories:", e)
-        layout.addWidget(self.searchBar, 0)
+        layout.addWidget(self.SEARCH_BAR, 0)
 
         self.pageStack = QStackedWidget()
         self._populate_page_stack()
@@ -155,13 +162,13 @@ class Landing(QMainWindow):
 
     def _build_nav(self):
         nav = QWidget()
-        nav.setObjectName(theme.navBar)
+        nav.setObjectName(theme.NAV_BAR)
         h = QHBoxLayout(nav)
         h.setContentsMargins(36, 18, 36, 18)
         h.setSpacing(12)
 
         self.nav_logo = QLabel()
-        self.nav_logo.setObjectName(theme.navLogo)
+        self.nav_logo.setObjectName(theme.NAV_LOGO)
         self.nav_logo.setCursor(
             QCursor(Qt.CursorShape.PointingHandCursor)
         )
@@ -231,16 +238,16 @@ class Landing(QMainWindow):
 
         # 4 - Volunteer home
         self.volunteerHomePage = VolunteerHome(db=self.db)
-        self.volunteerHomePage.tabChanged.connect(
+        self.volunteerHomePage.tab_changed.connect(
             lambda _i: self._sync_nav_highlight()
         )
-        self.volunteerHomePage.notificationsUpdated.connect(
+        self.volunteerHomePage.notifications_updated.connect(
             self._refresh_notif_badge
         )
-        self.volunteerHomePage.browseOpportunitiesRequested.connect(
+        self.volunteerHomePage.browse_opportunities_requested.connect(
             self.show_volunteer_listing_page
         )
-        self.volunteerHomePage.goToProfileRequested.connect(
+        self.volunteerHomePage.go_to_profile_requested.connect(
             lambda: self.show_volunteer_tab(TAB_PROFILE)
         )
         self.pageStack.addWidget(self.volunteerHomePage)
@@ -253,10 +260,10 @@ class Landing(QMainWindow):
         self.volunteerListingPage = VolunteerPage(
             db=self.db, on_back_click=self.show_home_page
         )
-        self.volunteerListingPage.openLinkRequested.connect(
+        self.volunteerListingPage.open_link_requested.connect(
             self.open_external_link
         )
-        self.volunteerListingPage.rsvpSucceeded.connect(
+        self.volunteerListingPage.rsvp_succeeded.connect(
             self._handle_rsvp_success
         )
         self.pageStack.addWidget(self.volunteerListingPage)
@@ -268,7 +275,7 @@ class Landing(QMainWindow):
             on_back_click=self.show_home_page,
         )
         if hasattr(self.orgDashboard, "tabChanged"):
-            self.orgDashboard.tabChanged.connect(
+            self.orgDashboard.tab_changed.connect(
                 lambda _i: self._sync_nav_highlight()
             )
         self.pageStack.addWidget(self.orgDashboard)
@@ -297,25 +304,25 @@ class Landing(QMainWindow):
         layout.addWidget(self.hero_widget, 0)
 
         self.featuresSection = FeaturesSection()
-        self.featuresSection.discoverRequested.connect(
+        self.featuresSection.discover_requested.connect(
             lambda: self.show_volunteer_listing_page()
         )
-        self.featuresSection.postRequested.connect(
+        self.featuresSection.post_requested.connect(
             self.show_org_register_page
         )
-        self.featuresSection.manageRequested.connect(
+        self.featuresSection.manage_requested.connect(
             self.show_org_register_page
         )
         layout.addWidget(self.featuresSection)
 
         self.opportunitiesSection = OpportunitiesSection()
-        self.opportunitiesSection.detailsRequested.connect(
+        self.opportunitiesSection.details_requested.connect(
             self._open_event_details
         )
-        self.opportunitiesSection.openLinkRequested.connect(
+        self.opportunitiesSection.open_link_requested.connect(
             self.open_external_link
         )
-        self.opportunitiesSection.rsvpRequested.connect(
+        self.opportunitiesSection.rsvp_requested.connect(
             self._handle_home_rsvp
         )
         layout.addWidget(self.opportunitiesSection)
@@ -327,7 +334,7 @@ class Landing(QMainWindow):
 
     def _build_hero(self):
         hero = HeroSection()
-        hero.learnMoreRequested.connect(self.show_volunteer_listing_page)
+        hero.learn_more_requested.connect(self.show_volunteer_listing_page)
         return hero
 
     # ── Session-aware nav bar (grouped) ───────────────────────────
@@ -396,7 +403,7 @@ class Landing(QMainWindow):
 
     # ── Signals ───────────────────────────────────────────────────
     def _wire_signals(self):
-        self.searchBar.searchRequested.connect(self.handle_search)
+        self.SEARCH_BAR.search_requested.connect(self.handle_search)
 
     # ── Navigation helpers ────────────────────────────────────────
     def _goto(self, page_widget):
@@ -405,7 +412,7 @@ class Landing(QMainWindow):
         self._sync_nav_highlight()
 
     def _sync_search_bar_visibility(self):
-        self.searchBar.setVisible(
+        self.SEARCH_BAR.setVisible(
             self.pageStack.currentWidget() is self.guestHomePage
         )
 
@@ -479,7 +486,7 @@ class Landing(QMainWindow):
         if self.matchPage is None:
             from Volunteer.volunteerMatch import VolunteerMatch
             self.matchPage = VolunteerMatch(self.db)
-            self.matchPage.browseAllRequested.connect(
+            self.matchPage.browse_all_requested.connect(
                 self.show_volunteer_listing_page
             )
             self.pageStack.addWidget(self.matchPage)
@@ -494,7 +501,7 @@ class Landing(QMainWindow):
         ExportDialog(self.db, self.current_user["userID"], self).exec()
 
     # ── Registration callback ─────────────────────────────────────
-    def _handle_registration_success(self, userID):
+    def _handle_registration_success(self, user_id):
         self.show_login_page()
 
     # ── Login callback ────────────────────────────────────────────
@@ -545,14 +552,14 @@ class Landing(QMainWindow):
             )
             return
 
-        result = self.db.registerForOpportunity(
+        result = self.db.register_for_opportunity(
             self.current_user["userID"], opportunity_id
         )
         if result == "ok":
             try:
-                row = self.db.getOpportunityByID(opportunity_id)
+                row = self.db.get_opportunity_by_id(opportunity_id)
                 title = row["title"] if row else "an event"
-                self.db.addNotification(
+                self.db.add_notification(
                     self.current_user["userID"],
                     f"You signed up for {title}.",
                     "rsvp", opportunity_id,
@@ -629,8 +636,8 @@ class Landing(QMainWindow):
         nav_pixmap = QPixmap(path).scaledToHeight(46, smooth)
         self.nav_logo.setPixmap(nav_pixmap)
 
-        if (hasattr(self, "hero_widget")
-                and hasattr(self.hero_widget, "set_theme")):
+        if (hasattr(self, "hero_widget") and
+                hasattr(self.hero_widget, "set_theme")):
             self.hero_widget.set_theme(self.is_dark_mode)
 
     # ── Notification badge ────────────────────────────────────────
@@ -643,7 +650,7 @@ class Landing(QMainWindow):
             self.notif_badge.setVisible(False)
             return
         try:
-            rows = self.db.getNotifications(
+            rows = self.db.get_notifications(
                 self.current_user["userID"], limit=50
             ) or []
         except Exception as e:
@@ -660,7 +667,7 @@ class Landing(QMainWindow):
     def _sync_hero_height(self):
         return
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         if hasattr(self, "global_mic"):
             self.global_mic.reposition()
@@ -670,7 +677,7 @@ class Landing(QMainWindow):
     def _app(self):
         return QApplication.instance()
 
-    def closeEvent(self, event):
+    def closeEvent(self, event):  # noqa: N802
         try:
             self.db.close()
         except Exception:

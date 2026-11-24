@@ -19,11 +19,20 @@ row is purely an identity row — one email, one password, one role.
 import random
 import string
 
-from PyQt6.QtCore import Qt, QByteArray
-from PyQt6.QtGui import QAction, QPixmap, QCursor
+from PyQt6.QtCore import QByteArray, Qt
+from PyQt6.QtGui import QAction, QCursor, QPixmap
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QFrame, QComboBox, QScrollArea, QMessageBox, QTextEdit
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
 
 try:
@@ -34,7 +43,6 @@ except ImportError:
 
 import Events.theme as theme
 from Authentication.otp import generate_otp, send_otp_email, verify_via_otp
-
 
 COUNTRY_CHOICES = [
     "Select Country",
@@ -154,7 +162,8 @@ class OrganizationRegistration(QWidget):
 
         location_row = QHBoxLayout()
         location_row.setSpacing(20)
-        location_row.addLayout(labeled("Country", self.country_input), stretch=2)
+        location_row.addLayout(
+            labeled("Country", self.country_input), stretch=2)
         location_row.addLayout(labeled("City", self.city_input), stretch=1)
         layout.addLayout(location_row)
 
@@ -181,7 +190,8 @@ class OrganizationRegistration(QWidget):
         pass_row = QHBoxLayout()
         pass_row.setSpacing(20)
         pass_row.addLayout(labeled("Password *", self.pass_input))
-        pass_row.addLayout(labeled("Confirm Password *", self.confirmPass_input))
+        pass_row.addLayout(
+            labeled("Confirm Password *", self.confirmPass_input))
         layout.addLayout(pass_row)
 
         # ── Captcha ───────────────────────────────────────────────────────
@@ -326,7 +336,7 @@ class OrganizationRegistration(QWidget):
         if not verify_via_otp(self, data["email"], code):
             return
 
-        userID = self.db.register_user(
+        user_id = self.db.register_user(
             email=data["email"],
             password=data["password"],
             role="org",
@@ -337,7 +347,7 @@ class OrganizationRegistration(QWidget):
             city=data["city"],
         )
 
-        if not userID:
+        if not user_id:
             QMessageBox.critical(
                 self, "Registration failed",
                 "Could not create the organization account. "
@@ -352,7 +362,7 @@ class OrganizationRegistration(QWidget):
 
         self._reset_form()
         if self.on_success:
-            self.on_success(userID)
+            self.on_success(user_id)
 
     # ── Reset ─────────────────────────────────────────────────────────────
     def _reset_form(self):

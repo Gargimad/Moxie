@@ -16,23 +16,32 @@ The filter dict emitted through `filtersChanged` looks like:
     "date_to": "YYYY-MM-DD" | "",
 }
 """
-from PyQt6.QtCore import Qt, QTimer, QDate, pyqtSignal
+from PyQt6.QtCore import QDate, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QComboBox, QPushButton, QDateEdit,
+    QComboBox,
+    QDateEdit,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
 from Events.careerClusters import CAREER_CLUSTERS
 from Events.gaLocations import (
-    GA_CITIES, ALL_CITIES, ALL_SCHOOLS, schools_for_city,
+    ALL_CITIES,
+    ALL_SCHOOLS,
+    ga_cities,
+    schools_for_city,
 )
 from Events.multiSelectCauses import MultiSelectCauses
 
 
 class FilterBar(QWidget):
-    filtersChanged = pyqtSignal(dict)
+    filters_changed = pyqtSignal(dict)
 
     TYPE_OPTIONS = ["All", "In-person", "Remote"]
     DATE_PRESETS = ["Any date", "Next 7 days", "Next 30 days",
@@ -63,7 +72,7 @@ class FilterBar(QWidget):
         self.city_combo = QComboBox()
         self.city_combo.setObjectName(theme.FILTER_COMBO)
         self.city_combo.addItem(ALL_CITIES)
-        for c in GA_CITIES:
+        for c in ga_cities:
             self.city_combo.addItem(c)
 
         self.zipcode_input = QLineEdit()
@@ -166,7 +175,7 @@ class FilterBar(QWidget):
         self.type_combo.currentTextChanged.connect(self._emit)
         self.city_combo.currentTextChanged.connect(self._on_city_changed)
         self.school_combo.currentTextChanged.connect(self._emit)
-        self.causes_multi.selectionChanged.connect(
+        self.causes_multi.selection_changed.connect(
             lambda _items: self._emit()
         )
         self.date_preset.currentTextChanged.connect(self._on_preset_changed)
@@ -201,9 +210,9 @@ class FilterBar(QWidget):
 
     def _advanced_active(self):
         return (
-            bool(self.causes_multi.checked_items())
-            or self.school_combo.currentIndex() > 0
-            or self.date_preset.currentIndex() > 0
+            bool(self.causes_multi.checked_items()) or
+            self.school_combo.currentIndex() > 0 or
+            self.date_preset.currentIndex() > 0
         )
 
     def _update_more_label(self):
@@ -262,7 +271,7 @@ class FilterBar(QWidget):
             "date_to": d_to,
         }
         self._update_more_label()
-        self.filtersChanged.emit(filters)
+        self.filters_changed.emit(filters)
 
     # ── External setters (used by landing.handle_search) ──────────────
     def set_search_text(self, text):
@@ -274,3 +283,4 @@ class FilterBar(QWidget):
         idx = self.type_combo.findText(value)
         if idx >= 0:
             self.type_combo.setCurrentIndex(idx)
+    filtersChanged = property(lambda self: self.filters_changed)  # noqa: N815

@@ -11,7 +11,7 @@ Public API (all on ChatView):
     view.on_reply(text)                    # call when the AI replies
     view.on_error(message)                 # call when the AI fails
     view.set_busy(bool)                    # lock/unlock the composer
-    view.reset()                           # start a NEW chat (old ones are kept)
+    view.reset()  # start a NEW chat (old ones are kept)
     view.show_history()                    # open the list of past chats
     view.open_session(session_id)          # switch to a past chat
     view.delete_session(session_id)        # delete a past chat
@@ -23,16 +23,25 @@ view.on_reply() / view.on_error().
 """
 
 import json
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
-    QScrollArea, QLineEdit, QSizePolicy, QDialog, QListWidget,
-    QListWidgetItem, QMessageBox,
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
-
 
 # Emoji icons. Each is a single codepoint (no variation selector), which
 # renders at full width on Windows instead of a thin, narrow glyph.
@@ -314,7 +323,8 @@ class ChatView(QWidget):
         btn.setObjectName("ChatIconButton")
         btn.setStyleSheet(
             f"border-radius: {size // 2}px;"
-            f"font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji';"
+            f"font-family: 'Segoe UI Emoji', 'Apple Color Emoji', "
+            f"'Noto Color Emoji';"
             f"font-size: {font_px}px;"
         )
         return btn
@@ -353,9 +363,9 @@ class ChatView(QWidget):
 
     @staticmethod
     def _clean_message(m):
-        if (isinstance(m, dict)
-                and m.get("role") in ("user", "assistant")
-                and isinstance(m.get("content"), str)):
+        if (isinstance(m, dict) and
+                m.get("role") in ("user", "assistant") and
+                isinstance(m.get("content"), str)):
             return {
                 "role": m["role"],
                 "content": m["content"],

@@ -77,17 +77,17 @@ def apply_theme(app, is_dark: bool) -> bool:
 
 
 # ── Navigation / chrome ───────────────────────────────────────────────
-navBar = "NavBar"
-navLogo = "NavLogo"
-navDropdown = "NavDropdown"
-searchBar = "SearchBar"
-searchInput = "SearchInput"
-searchBtn = "SearchBtn"
-searchCategory = "SearchCategoryCombo"
+NAV_BAR = "NavBar"
+NAV_LOGO = "NavLogo"
+NAV_DROPDOWN = "NavDropdown"
+SEARCH_BAR = "SearchBar"
+SEARCH_INPUT = "SearchInput"
+SEARCH_BTN = "SearchBtn"
+SEARCH_CATEGORY = "SearchCategoryCombo"
 
 # ── Home / marketing ──────────────────────────────────────────────────
-heroSection = "HeroSection"
-heroLogo = "HeroLogo"
+HERO_SECTION = "HeroSection"
+HERO_LOGO = "HeroLogo"
 HOME_SCROLL = "HomeScrollArea"
 HOME_SCROLL_CONTENT = "HomeScrollContent"
 SECTION_TITLE = "SectionTitle"
@@ -249,7 +249,7 @@ ORG_OPP_LIST = "OrgOppList"
 
 # ── FAQ ───────────────────────────────────────────────────────────────
 FAQ_PAGE = "FAQPage"
-faqItem = "FAQItem"
+FAQ_ITEM = "FAQItem"
 FAQ_CATEGORY = "FAQCategoryHeading"
 FAQ_HEADER = "FAQHeader"
 FAQ_QUESTION = "FAQQuestion"
@@ -262,3 +262,13 @@ FAQ_SCROLL_CONTENT = "FAQScrollContent"
 FAQ_NO_RESULTS = "FAQNoResults"
 FAQ_SUBTITLE = "FAQSubtitle"
 FAQ_CAT_PILL = "FAQCatPill"
+faqItem = FAQ_ITEM  # noqa: N816
+heroLogo = HERO_LOGO  # noqa: N816
+heroSection = HERO_SECTION  # noqa: N816
+navBar = NAV_BAR  # noqa: N816
+navDropdown = NAV_DROPDOWN  # noqa: N816
+navLogo = NAV_LOGO  # noqa: N816
+searchBar = SEARCH_BAR  # noqa: N816
+searchBtn = SEARCH_BTN  # noqa: N816
+searchCategory = SEARCH_CATEGORY  # noqa: N816
+searchInput = SEARCH_INPUT  # noqa: N816

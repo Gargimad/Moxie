@@ -22,29 +22,51 @@ import zlib
 from datetime import date, datetime, time, timedelta
 
 from PyQt6.QtCore import (
-    Qt, QPointF, QRectF, QThread, QTimer, pyqtSignal,
+    QPointF,
+    QRectF,
+    Qt,
+    QThread,
+    QTimer,
+    pyqtSignal,
 )
-from PyQt6.QtGui import QColor, QPainter, QPalette, QCursor
+from PyQt6.QtGui import QColor, QCursor, QPainter, QPalette
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
-    QStackedWidget, QScrollArea, QMessageBox,
-    QCalendarWidget, QLineEdit, QCheckBox, QFormLayout,
-    QGridLayout, QProgressBar, QFileDialog,
+    QCalendarWidget,
+    QCheckBox,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
 from Chatbot.chatBubble import ChatView
 from Events.dateFormat import (
-    format_range, format_time_range, format_event_when,
+    format_event_when,
+    format_range,
+    format_time_range,
 )
 from Events.eventCard import EventCard
 from Events.eventDetailsDialog import EventDetailsDialog
 from Events.moxieCharts import (
-    KpiTile, HBarChart, AreaChart, DonutChart, section_label,
+    AreaChart,
+    DonutChart,
+    HBarChart,
+    KpiTile,
+    section_label,
 )
-from Volunteer.volunteerNotifications import VolunteerNotifications
 from Volunteer.volunteerBookmarks import VolunteerBookmarks
-
+from Volunteer.volunteerNotifications import VolunteerNotifications
 
 # ── Constants ─────────────────────────────────────────────────────────
 ISO = "yyyy-MM-dd"
@@ -132,7 +154,7 @@ class EventCalendar(QCalendarWidget):
         self.events_by_date = events_by_date
         self.updateCells()
 
-    def paintCell(self, painter, rect, d):
+    def paintCell(self, painter, rect, d):  # noqa: N802
         super().paintCell(painter, rect, d)
         events = self.events_by_date.get(d.toString(ISO))
         if not events:
@@ -226,17 +248,17 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         "Notifications", "Help", "Profile", "Bookmarks",
     ]
 
-    tabChanged = pyqtSignal(int)
-    notificationsUpdated = pyqtSignal()
-    browseOpportunitiesRequested = pyqtSignal()
-    goToProfileRequested = pyqtSignal()
+    tab_changed = pyqtSignal(int)
+    notifications_updated = pyqtSignal()
+    browse_opportunities_requested = pyqtSignal()
+    go_to_profile_requested = pyqtSignal()
 
     def __init__(self, on_logout_click=None, db=None, parent=None):
         super().__init__(parent)
         self.on_logout_click = on_logout_click
         self.db = db
         self.user_data = None
-        self.userID = None
+        self.user_id = None
 
         self._chat_history = []
         self._chat_worker = None
@@ -296,11 +318,11 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         return bool(ok)
 
     def _notify(self, message, type_=None, opportunity_id=None):
-        if not (self.db and self.userID):
+        if not (self.db and self.user_id):
             return
         try:
-            self.db.addNotification(
-                self.userID, message, type_, opportunity_id
+            self.db.add_notification(
+                self.user_id, message, type_, opportunity_id
             )
         except Exception as e:
             print("addNotification failed:", e)
@@ -592,13 +614,13 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         browse = QPushButton("Browse opportunities")
         browse.setObjectName(theme.PRIMARY_BTN)
         browse.setCursor(Qt.CursorShape.PointingHandCursor)
-        browse.clicked.connect(self.browseOpportunitiesRequested.emit)
+        browse.clicked.connect(self.browse_opportunities_requested.emit)
         row.addWidget(browse)
 
         profile = QPushButton("Complete your profile")
         profile.setObjectName(theme.SECONDARY_BTN)
         profile.setCursor(Qt.CursorShape.PointingHandCursor)
-        profile.clicked.connect(self.goToProfileRequested.emit)
+        profile.clicked.connect(self.go_to_profile_requested.emit)
         row.addWidget(profile)
 
         row.addStretch(1)
@@ -675,8 +697,8 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
 
     def _refresh_calendar(self):
         rows = self._db(
-            "getSignupsForVolunteer", self.userID, default=[]
-        ) if self.userID else []
+            "getSignupsForVolunteer", self.user_id, default=[]
+        ) if self.user_id else []
         rows = [
             r for r in rows
             if (rget(r, "status", "") or "") != "cancelled"
@@ -756,11 +778,11 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         return page
 
     def _refresh_events(self):
-        if not (self.db and self.userID):
+        if not (self.db and self.user_id):
             return
         self._clear(self.events_layout)
         rows = self._db(
-            "getSignupsForVolunteer", self.userID, default=[]
+            "getSignupsForVolunteer", self.user_id, default=[]
         )
 
         if not rows:
@@ -835,31 +857,31 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         lay.addLayout(row)
         return card
 
-    def _do_check_in(self, opportunityID):
-        if self.db.checkIn(self.userID, opportunityID):
+    def _do_check_in(self, opportunity_id):
+        if self.db.check_in(self.user_id, opportunity_id):
             self._notify(
                 "You checked in. Remember to check out when you're done.",
-                "check_in", opportunityID,
+                "check_in", opportunity_id,
             )
             self._after_signup_change()
 
-    def _do_check_out(self, opportunityID):
-        if self.db.checkOut(self.userID, opportunityID):
+    def _do_check_out(self, opportunity_id):
+        if self.db.check_out(self.user_id, opportunity_id):
             self._notify(
                 "You checked out. Your hours have been recorded.",
-                "check_out", opportunityID,
+                "check_out", opportunity_id,
             )
             self._after_signup_change()
 
-    def _do_cancel(self, opportunityID):
+    def _do_cancel(self, opportunity_id):
         if QMessageBox.question(
             self, "Cancel RSVP", "Cancel your signup for this event?"
         ) != QMessageBox.StandardButton.Yes:
             return
-        if self.db.cancelSignup(self.userID, opportunityID):
+        if self.db.cancel_signup(self.user_id, opportunity_id):
             self._notify(
                 "You cancelled your signup for an event.",
-                "cancel", opportunityID,
+                "cancel", opportunity_id,
             )
             self._after_signup_change()
 
@@ -882,10 +904,10 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         return page
 
     def _refresh_orgs(self):
-        if not (self.db and self.userID):
+        if not (self.db and self.user_id):
             return
         self._org_rows = self._db(
-            "getOrganizations", self.userID, default=[]
+            "getOrganizations", self.user_id, default=[]
         ) or []
         self._render_orgs()
 
@@ -963,17 +985,17 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         lay.addLayout(row)
         return card
 
-    def _do_join(self, orgID):
-        if self._db_action("joinOrganization", self.userID, orgID):
+    def _do_join(self, org_id):
+        if self._db_action("joinOrganization", self.user_id, org_id):
             self._notify("You joined a new organization.", "join_org")
             self._refresh_orgs()
 
-    def _do_leave(self, orgID, name):
+    def _do_leave(self, org_id, name):
         if QMessageBox.question(
             self, "Leave organization", f"Leave {name}?"
         ) != QMessageBox.StandardButton.Yes:
             return
-        if self._db_action("leaveOrganization", self.userID, orgID):
+        if self._db_action("leaveOrganization", self.user_id, org_id):
             self._notify("You left an organization.", "leave_org")
             self._refresh_orgs()
 
@@ -1009,7 +1031,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         name = (self.user_data or {}).get("first_name") or "the volunteer"
 
         rows = self._db(
-            "getSignupsForVolunteer", self.userID, default=[]
+            "getSignupsForVolunteer", self.user_id, default=[]
         ) or []
         rows = [
             r for r in rows
@@ -1183,8 +1205,8 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
 
     def _refresh_profile(self):
         profile = None
-        if self.userID:
-            profile = self._db("getUserProfile", self.userID)
+        if self.user_id:
+            profile = self._db("getUserProfile", self.user_id)
         src = profile or self.user_data or {}
         self.pf_first.setText(str(rget(src, "first_name", "")))
         self.pf_last.setText(str(rget(src, "last_name", "")))
@@ -1214,7 +1236,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
             "skills": self.pf_skills.text().strip(),
             "notify_email": 1 if self.pf_notify.isChecked() else 0,
         }
-        if self._db_action("updateUserProfile", self.userID, fields):
+        if self._db_action("updateUserProfile", self.user_id, fields):
             if self.user_data is not None:
                 self.user_data.update(fields)
             self.welcome_title.setText(f"Welcome, {first}!")
@@ -1245,7 +1267,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
                 self, "Password", "Use at least 8 characters."
             )
             return
-        if self._db_action("changePassword", self.userID, old, new):
+        if self._db_action("changePassword", self.user_id, old, new):
             for f in (self.pw_old, self.pw_new, self.pw_confirm):
                 f.clear()
             QMessageBox.information(
@@ -1275,7 +1297,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         }.get(idx)
         if refresh:
             refresh()
-        self.tabChanged.emit(idx)
+        self.tab_changed.emit(idx)
 
     # ── User data ─────────────────────────────────────────────────────
     def set_user_data(self, user_data):
@@ -1283,7 +1305,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         if not user_data:
             return
 
-        self.userID = user_data.get("userID") or user_data.get("id")
+        self.user_id = user_data.get("userID") or user_data.get("id")
         first_name = user_data.get("first_name") or "Volunteer"
         email = user_data.get("email", "")
 
@@ -1341,11 +1363,11 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
             except Exception:
                 pass
 
-        if not (self.db and self.userID):
+        if not (self.db and self.user_id):
             return
 
         rows = self._db(
-            "getSignupsForVolunteer", self.userID, default=[]
+            "getSignupsForVolunteer", self.user_id, default=[]
         ) or []
         active = [
             r for r in rows
@@ -1375,8 +1397,8 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         completed = [r for r in active if rget(r, "check_out_time")]
         upcoming = sorted(
             (r for r in active
-             if end_day(r) >= today_s
-             and not rget(r, "check_out_time")),
+             if end_day(r) >= today_s and
+             not rget(r, "check_out_time")),
             key=lambda r: (day(r), str(rget(r, "start_time", ""))),
         )
         past = [r for r in active if end_day(r) and end_day(r) < today_s]
@@ -1384,7 +1406,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         total_hours = sum(hrs(r) for r in active)
 
         org_rows = self._db(
-            "getOrganizations", self.userID, default=None
+            "getOrganizations", self.user_id, default=None
         )
         if org_rows is not None:
             joined = sorted(
@@ -1459,7 +1481,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
 
         # Recent notifications
         notifs = self._db(
-            "getNotifications", self.userID, default=[]
+            "getNotifications", self.user_id, default=[]
         ) or []
         notifs = sorted(
             notifs,
@@ -1507,10 +1529,10 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
             return
 
         user_profile = (
-            self._db("getUserProfile", self.userID) or self.user_data
+            self._db("getUserProfile", self.user_id) or self.user_data
         )
         joined_orgs = self._db(
-            "getOrganizations", self.userID, default=[]
+            "getOrganizations", self.user_id, default=[]
         ) or []
 
         skills = str(rget(user_profile, "skills", "") or "").strip()
@@ -1545,7 +1567,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         # Bookmarked IDs so card stars render correctly.
         try:
             bookmarked = self._db(
-                "getBookmarkedIDs", self.userID, default=set()
+                "getBookmarkedIDs", self.user_id, default=set()
             ) or set()
         except Exception:
             bookmarked = set()
@@ -1554,40 +1576,40 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
         for r, s in zip(recs, scores):
             card = EventCard(
                 r, view_mode="list",
-                current_volunteer_id=self.userID,
+                current_volunteer_id=self.user_id,
                 bookmarked_ids=bookmarked,
             )
             card.set_bookmark_callback(self._on_rec_bookmark)
-            card.detailsRequested.connect(self._show_rec_details)
-            card.rsvpRequested.connect(self._handle_rec_rsvp)
+            card.details_requested.connect(self._show_rec_details)
+            card.rsvp_requested.connect(self._handle_rec_rsvp)
             self.dash_recommended.addWidget(card)
 
-    def _on_rec_bookmark(self, opportunityID, is_bookmarked):
-        if not self.userID:
+    def _on_rec_bookmark(self, opportunity_id, is_bookmarked):
+        if not self.user_id:
             return
-        result = self.db.toggleBookmark(self.userID, opportunityID)
+        result = self.db.toggle_bookmark(self.user_id, opportunity_id)
         if result == "added":
-            self._bookmarked_ids.add(opportunityID)
+            self._bookmarked_ids.add(opportunity_id)
         elif result == "removed":
-            self._bookmarked_ids.discard(opportunityID)
+            self._bookmarked_ids.discard(opportunity_id)
 
     def _show_rec_details(self, card):
         EventDetailsDialog(card, self).exec()
 
-    def _handle_rec_rsvp(self, opportunityID):
-        if not self.userID:
+    def _handle_rec_rsvp(self, opportunity_id):
+        if not self.user_id:
             return
-        result = self.db.registerForOpportunity(
-            self.userID, opportunityID
+        result = self.db.register_for_opportunity(
+            self.user_id, opportunity_id
         )
         if result == "ok":
             try:
-                row = self.db.getOpportunityByID(opportunityID)
+                row = self.db.get_opportunity_by_id(opportunity_id)
                 title = row["title"] if row else "an event"
-                self.db.addNotification(
-                    self.userID,
+                self.db.add_notification(
+                    self.user_id,
                     f"You signed up for {title}.",
-                    "rsvp", opportunityID,
+                    "rsvp", opportunity_id,
                 )
             except Exception:
                 pass
@@ -1614,9 +1636,9 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
     def _notify_upcoming_events(self, rows):
         now = datetime.now()
         for row in rows:
-            if (rget(row, "reminder_sent", 0)
-                    or rget(row, "check_out_time")
-                    or rget(row, "no_show", 0)):
+            if (rget(row, "reminder_sent", 0) or
+                    rget(row, "check_out_time") or
+                    rget(row, "no_show", 0)):
                 continue
             try:
                 event_date = date.fromisoformat(
@@ -1632,17 +1654,17 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
             if timedelta(0) <= starts_in <= timedelta(hours=24):
                 self._db(
                     "notifyUpcomingSignup",
-                    rget(row, "signupID"), self.userID,
+                    rget(row, "signupID"), self.user_id,
                     rget(row, "opportunityID"),
                     rget(row, "title", "Your volunteer event"),
                     default=False,
                 )
 
     def _check_upcoming_reminders(self):
-        if not (self.userID and self.isVisible()):
+        if not (self.user_id and self.isVisible()):
             return
         rows = self._db(
-            "getSignupsForVolunteer", self.userID, default=[]
+            "getSignupsForVolunteer", self.user_id, default=[]
         ) or []
         self._notify_upcoming_events([
             row for row in rows
@@ -1651,7 +1673,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
 
     def _export_impact_record(self):
         rows = self._db(
-            "getSignupsForVolunteer", self.userID, default=[]
+            "getSignupsForVolunteer", self.user_id, default=[]
         ) or []
         verified = [
             r for r in rows
@@ -1668,9 +1690,13 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
                       encoding="utf-8-sig") as file:
                 writer = csv.writer(file)
                 writer.writerow(["Moxie volunteer impact record"])
+                verified_hours = sum(
+                    float(rget(record, "hours_logged", 0) or 0)
+                    for record in verified
+                )
                 writer.writerow([
                     "Verified hours",
-                    f"{sum(float(rget(r, 'hours_logged', 0) or 0) for r in verified):.2f}",
+                    f"{verified_hours:.2f}",
                 ])
                 writer.writerow([])
                 writer.writerow([
@@ -1694,3 +1720,7 @@ class VolunteerHome(VolunteerNotifications, VolunteerBookmarks, QWidget):
             self, "Export complete",
             f"Saved {len(verified)} verified event records.",
         )
+    browseOpportunitiesRequested = property(lambda self: self.browse_opportunities_requested)  # noqa: N815
+    goToProfileRequested = property(lambda self: self.go_to_profile_requested)  # noqa: N815
+    notificationsUpdated = property(lambda self: self.notifications_updated)  # noqa: N815
+    tabChanged = property(lambda self: self.tab_changed)  # noqa: N815

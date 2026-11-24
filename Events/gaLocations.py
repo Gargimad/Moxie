@@ -4,7 +4,7 @@ volunteer filter row. City -> schools mapping narrows the school
 list when a city is chosen.
 """
 
-GA_CITIES = [
+ga_cities = [
     "Atlanta", "Augusta", "Columbus", "Macon", "Savannah",
     "Athens", "Sandy Springs", "Roswell", "Johns Creek", "Albany",
     "Warner Robins", "Alpharetta", "Marietta", "Valdosta", "Smyrna",

@@ -2,19 +2,27 @@
 the volunteer listing page."""
 import hashlib
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 
-from PyQt6.QtCore import Qt, QByteArray, pyqtSignal, QRectF
-from PyQt6.QtGui import QPixmap, QCursor, QPainter, QPainterPath
+from PyQt6.QtCore import QByteArray, QRectF, Qt, pyqtSignal
+from PyQt6.QtGui import QCursor, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import (
-    QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
     QWidget,
 )
-from Events.dateFormat import (
-    format_date_short, format_time, format_weekday,
-)
+
 import Events.theme as theme
+from Events.dateFormat import (
+    format_date_short,
+    format_time,
+    format_weekday,
+)
 
 FALLBACK_IMAGE = theme.asset("noThumbnail.png")
 THUMB_CACHE_DIR = os.path.join(
@@ -236,9 +244,9 @@ def make_meta_row(key, value):
 
 # ── EventCard ────────────────────────────────────────────────────────
 class EventCard(QFrame):
-    openLinkRequested = pyqtSignal(str)
-    rsvpRequested = pyqtSignal(int)
-    detailsRequested = pyqtSignal(object)
+    open_link_requested = pyqtSignal(str)
+    rsvp_requested = pyqtSignal(int)
+    details_requested = pyqtSignal(object)
 
     GRID_WIDTH = 300
     GRID_THUMB_H = 150
@@ -274,7 +282,7 @@ class EventCard(QFrame):
         )
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
-        self.opportunityID = g("opportunityID", 0)
+        self.opportunity_id = g("opportunityID", 0)
         self.title = g("title", "Untitled event")
         self.description = g("description", "")
         self.category = g("category", "")
@@ -294,8 +302,8 @@ class EventCard(QFrame):
         except (TypeError, ValueError):
             self.registered_count = 0
 
-        if (self.status == "open" and self.capacity
-                and self.registered_count >= self.capacity):
+        if (self.status == "open" and self.capacity and
+                self.registered_count >= self.capacity):
             self.status = "full"
 
         if view_mode == "list":
@@ -317,7 +325,7 @@ class EventCard(QFrame):
 
         pixmap = load_thumbnail_pixmap(
             self.thumbnail, w, h,
-            key=self.opportunityID or None,
+            key=self.opportunity_id or None,
             radius=THUMB_RADIUS,
         )
         if pixmap is not None:
@@ -392,7 +400,7 @@ class EventCard(QFrame):
     def _is_bookmarked(self):
         if not self.current_volunteer_id or not self._bookmarked_ids:
             return False
-        return self.opportunityID in self._bookmarked_ids
+        return self.opportunity_id in self._bookmarked_ids
 
     def set_bookmark_callback(self, fn):
         self._bookmark_cb = fn
@@ -415,15 +423,15 @@ class EventCard(QFrame):
     def _toggle_bookmark(self):
         if not self.current_volunteer_id:
             return
-        emit_add = self.opportunityID not in self._bookmarked_ids
+        emit_add = self.opportunity_id not in self._bookmarked_ids
         if emit_add:
-            self._bookmarked_ids.add(self.opportunityID)
+            self._bookmarked_ids.add(self.opportunity_id)
         else:
-            self._bookmarked_ids.discard(self.opportunityID)
+            self._bookmarked_ids.discard(self.opportunity_id)
         on = self._is_bookmarked()
         self._refresh_bookmark_button()
         if self._bookmark_cb:
-            self._bookmark_cb(self.opportunityID, on)
+            self._bookmark_cb(self.opportunity_id, on)
 
     def _refresh_bookmark_button(self):
         for b in self.findChildren(QPushButton):
@@ -658,19 +666,23 @@ class EventCard(QFrame):
 
         layout.addLayout(content, 1)
     # ── Events ───────────────────────────────────────────────────────
+
     def open_link(self):
         if self.website_link:
-            self.openLinkRequested.emit(self.website_link)
+            self.open_link_requested.emit(self.website_link)
 
     def request_rsvp(self):
-        if self.opportunityID:
-            self.rsvpRequested.emit(self.opportunityID)
+        if self.opportunity_id:
+            self.rsvp_requested.emit(self.opportunity_id)
 
     def request_details(self):
-        self.detailsRequested.emit(self)
+        self.details_requested.emit(self)
 
-    def mouseReleaseEvent(self, event):
-        if (event.button() == Qt.MouseButton.LeftButton
-                and self.rect().contains(event.position().toPoint())):
-            self.detailsRequested.emit(self)
+    def mouseReleaseEvent(self, event):  # noqa: N802
+        if (event.button() == Qt.MouseButton.LeftButton and
+                self.rect().contains(event.position().toPoint())):
+            self.details_requested.emit(self)
         super().mouseReleaseEvent(event)
+    detailsRequested = property(lambda self: self.details_requested)  # noqa: N815
+    openLinkRequested = property(lambda self: self.open_link_requested)  # noqa: N815
+    rsvpRequested = property(lambda self: self.rsvp_requested)  # noqa: N815

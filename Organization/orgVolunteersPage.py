@@ -15,8 +15,16 @@ Database instance.
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QComboBox, QScrollArea, QFrame, QMessageBox,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -206,10 +214,10 @@ class OrgVolunteersPage(QWidget):
         hours.setStyleSheet("font-size: 18px; font-weight: bold;")
         events = QLabel(
             f"{r['total_signups']} signup"
-            f"{'s' if r['total_signups'] != 1 else ''}"
-            + (f"  •  {r['no_shows']} no-show"
-               f"{'s' if r['no_shows'] != 1 else ''}"
-               if r["no_shows"] else "")
+            f"{'s' if r['total_signups'] != 1 else ''}" +
+            (f"  •  {r['no_shows']} no-show"
+             f"{'s' if r['no_shows'] != 1 else ''}"
+             if r["no_shows"] else "")
         )
         events.setObjectName(theme.EVENT_META_VALUE)
         stats.addWidget(hours)
@@ -256,7 +264,9 @@ class OrgVolunteersPage(QWidget):
                         "yes" if r["banned"] else "no",
                     ])
             QMessageBox.information(
-                self, "Exported", f"Saved {len(self._filtered)} rows to:\n{path}"
+                self,
+                "Exported",
+                f"Saved {len(self._filtered)} rows to:\n{path}",
             )
         except OSError as e:
             QMessageBox.warning(self, "Export failed", str(e))

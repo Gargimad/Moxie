@@ -17,8 +17,17 @@ landing.py routes based on user['role'].
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QFrame, QMessageBox, QButtonGroup, QDialog, QFormLayout,
+    QButtonGroup,
+    QDialog,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -192,7 +201,7 @@ class Login(QWidget):
                     "Enter the same password in both fields."
                 )
                 return
-            if not self.db.activateImportedVolunteer(
+            if not self.db.activate_imported_volunteer(
                     address, activation_code, new_password):
                 QMessageBox.warning(
                     dlg, "Activation failed",

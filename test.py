@@ -23,8 +23,8 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from db import Database
-from Events.careerClusters import CAREER_CLUSTERS
+from db import Database  # noqa: E402
+from Events.careerClusters import CAREER_CLUSTERS  # noqa: E402
 
 
 # ── Locate the CSV ────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ def main():
     org_ids = {}
     for name, info in unique_orgs.items():
         try:
-            orgID = db.get_or_create_organization(
+            org_id = db.get_or_create_organization(
                 org_name=name,
                 website_link=info["website"],
                 city=info["city"],
@@ -163,8 +163,8 @@ def main():
         except Exception as e:
             print(f"  ! {name}: {e}")
             continue
-        if orgID:
-            org_ids[name] = orgID
+        if org_id:
+            org_ids[name] = org_id
             print(f"  ✓ #{orgID:>3}  {name}")
         else:
             print(f"  ✗ failed: {name}")
@@ -180,8 +180,8 @@ def main():
 
     for i, row in enumerate(rows, start=2):
         org_name = _clean(row.get("org_name"))
-        orgID = org_ids.get(org_name)
-        if not orgID:
+        org_id = org_ids.get(org_name)
+        if not org_id:
             skipped += 1
             continue
 
@@ -198,10 +198,10 @@ def main():
         end_iso = _norm_date(row.get("event_end_date"))
 
         # Dedup within this org's existing events.
-        existing = db.getOpportunitiesByOrg(orgID)
+        existing = db.get_opportunities_by_org(org_id)
         if any(
-            o["title"] == title
-            and str(o["event_date"] or "")[:10] == (start_iso or "")[:10]
+            o["title"] == title and
+            str(o["event_date"] or "")[:10] == (start_iso or "")[:10]
             for o in existing
         ):
             skipped += 1
@@ -212,8 +212,8 @@ def main():
             unmapped_cluster += 1
 
         try:
-            oppID = db.addOpportunity(
-                orgID=orgID,
+            opp_id = db.add_opportunity(
+                org_id=org_id,
                 title=title,
                 description=_clean(row.get("description")),
                 category="",                    # superseded by clusters
@@ -250,12 +250,12 @@ def main():
             skipped += 1
             continue
 
-        if not oppID:
+        if not opp_id:
             skipped += 1
             continue
 
         if cluster:
-            db.setOpportunityClusters(oppID, [cluster])
+            db.set_opportunity_clusters(opp_id, [cluster])
             cluster_counts[cluster] += 1
 
         added += 1
@@ -272,8 +272,8 @@ def main():
 
     # ── Verify ────────────────────────────────────────────────────
     print("\nVerifying...")
-    total_opps = len(db.getAllOpportunities(limit=1000))
-    total_orgs = len(db.getOrganizations(1))
+    total_opps = len(db.get_all_opportunities(limit=1000))
+    total_orgs = len(db.get_organizations(1))
     print(f"  Events in DB:         {total_opps}")
     print(f"  Organizations in DB:  {total_orgs}")
     print(f"  Clusters available:   {len(db.getCareerClusters())}")

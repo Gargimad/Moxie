@@ -12,10 +12,16 @@ the layout scales cleanly on resize.
 import os
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap, QCursor, QColor
+from PyQt6.QtGui import QColor, QCursor, QPixmap
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
-    QSizePolicy, QGraphicsDropShadowEffect,
+    QFrame,
+    QGraphicsDropShadowEffect,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -61,7 +67,7 @@ class HeroPhoto(QLabel):
         y = (scaled.height() - h) // 2
         self.setPixmap(scaled.copy(x, y, w, h))
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         self._rescale()
 
@@ -70,7 +76,7 @@ class HeroSection(QWidget):
     """Editorial hero: colored left panel with three photos, wordmark
     headline + mission on the right, solid bar across the bottom."""
 
-    learnMoreRequested = pyqtSignal()
+    learn_more_requested = pyqtSignal()
 
     # Photos are positioned as fractions of the LEFT PANEL's size.
     # (x, y, w, h, filename). Later entries render on top of earlier.
@@ -85,7 +91,7 @@ class HeroSection(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName(theme.heroSection)
+        self.setObjectName(theme.HERO_SECTION)
         self.setMinimumHeight(600)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Preferred)
@@ -144,7 +150,7 @@ class HeroSection(QWidget):
         learn.setObjectName(theme.HERO_LEARN_BTN)
         learn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         learn.setFixedSize(180, 54)
-        learn.clicked.connect(self.learnMoreRequested.emit)
+        learn.clicked.connect(self.learn_more_requested.emit)
         btn_row.addWidget(learn)
         btn_row.addStretch(1)
         v.addLayout(btn_row)
@@ -175,7 +181,7 @@ class HeroSection(QWidget):
         self._load_wordmark(is_dark)
 
     # ── Resize ────────────────────────────────────────────────────────
-    def resizeEvent(self, event):
+    def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         self._relayout()
 
@@ -209,3 +215,4 @@ class HeroSection(QWidget):
         for photo in self._photos:
             photo.raise_()
         self.text_panel.raise_()
+    learnMoreRequested = property(lambda self: self.learn_more_requested)  # noqa: N815

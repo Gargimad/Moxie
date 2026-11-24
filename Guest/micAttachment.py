@@ -17,9 +17,10 @@ def attach_mic_to_line_edit(widget: QLineEdit):
     try:
         from Guest.voiceWorker import VoiceWorker
     except ImportError as e:
-        VoiceWorker = None
+        voice_worker_class = None
         import_error = str(e)
     else:
+        voice_worker_class = VoiceWorker
         import_error = ""
 
     action = QAction(widget)
@@ -45,14 +46,14 @@ def attach_mic_to_line_edit(widget: QLineEdit):
         action.setToolTip("Dictate into this field")
 
     def start():
-        if VoiceWorker is None:
+        if voice_worker_class is None:
             QMessageBox.warning(
                 widget, "Voice unavailable",
                 "Speech recognition isn't installed on this system.\n\n"
                 f"({import_error})",
             )
             return
-        worker = VoiceWorker(widget)
+        worker = voice_worker_class(widget)
         state["worker"] = worker
         worker.transcribed.connect(on_result)
         worker.failed.connect(on_error)

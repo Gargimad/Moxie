@@ -12,15 +12,15 @@ shows a friendly hint instead of failing silently.
 
 import weakref
 
-from PyQt6.QtCore import QObject, QEvent
-from PyQt6.QtWidgets import QLineEdit, QTextEdit, QPlainTextEdit
+from PyQt6.QtCore import QEvent, QObject
+from PyQt6.QtWidgets import QLineEdit, QPlainTextEdit, QTextEdit
 
 
 class FocusTracker(QObject):
     # Weak reference to the last focused input widget, or None.
     last_input = None
 
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj, event):  # noqa: N802
         if event.type() == QEvent.Type.FocusIn:
             if isinstance(obj, (QLineEdit, QTextEdit, QPlainTextEdit)):
                 # Store a weak ref so closing a page doesn't keep

@@ -16,12 +16,11 @@ Design notes:
       message the first time only.
 """
 
-from PyQt6.QtCore import Qt, QPoint, QTimer
+from PyQt6.QtCore import QPoint, Qt, QTimer
 from PyQt6.QtGui import QCursor
-from PyQt6.QtWidgets import QPushButton, QMessageBox
+from PyQt6.QtWidgets import QMessageBox, QPushButton
 
 import Guest.focusTracker as focusTracker
-
 
 # Size and position of the floating button.
 SIZE = 44

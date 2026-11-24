@@ -2,8 +2,16 @@
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QStackedWidget, QGridLayout, QButtonGroup, QMessageBox,
+    QButtonGroup,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -13,8 +21,8 @@ from Events.filterSidebar import FilterSidebar
 
 
 class VolunteerPage(QWidget):
-    openLinkRequested = pyqtSignal(str)
-    rsvpSucceeded = pyqtSignal(int)
+    open_link_requested = pyqtSignal(str)
+    rsvp_succeeded = pyqtSignal(int)
 
     def __init__(self, db, on_back_click=None, parent=None):
         super().__init__(parent)
@@ -41,7 +49,7 @@ class VolunteerPage(QWidget):
         body.setSpacing(0)
 
         self.filter_sidebar = FilterSidebar()
-        self.filter_sidebar.filtersChanged.connect(self.apply_filters)
+        self.filter_sidebar.filters_changed.connect(self.apply_filters)
         body.addWidget(self.filter_sidebar, 0)
 
         main = QWidget()
@@ -202,7 +210,7 @@ class VolunteerPage(QWidget):
         self._bookmarked_ids = set()
         if volunteer_id:
             try:
-                self._bookmarked_ids = self.db.getBookmarkedIDs(
+                self._bookmarked_ids = self.db.get_bookmarked_ids(
                     volunteer_id
                 )
             except Exception:
@@ -229,7 +237,7 @@ class VolunteerPage(QWidget):
     def _query_db(self):
         f = self.current_filters or {}
         date_enabled = f.get("date_enabled", False)
-        return self.db.searchOpportunitiesFiltered(
+        return self.db.search_opportunities_filtered(
             keyword=f.get("keyword", ""),
             type_filter=f.get("type", "All"),
             location=f.get("location", ""),
@@ -301,10 +309,10 @@ class VolunteerPage(QWidget):
         try:
             from Volunteer.ml_recommender import rank_opportunities
 
-            user_profile = self.db.getUserProfile(
+            user_profile = self.db.get_user_profile(
                 self.current_volunteer_id
             )
-            signup_rows = self.db.getSignupsForVolunteer(
+            signup_rows = self.db.get_signups_for_volunteer(
                 self.current_volunteer_id
             )
             active_signups = [
@@ -312,12 +320,12 @@ class VolunteerPage(QWidget):
                 if (row["status"] or "") != "cancelled"
             ]
             joined_orgs = [
-                row for row in self.db.getOrganizations(
+                row for row in self.db.get_organizations(
                     self.current_volunteer_id
                 )
                 if row["is_member"]
             ]
-            opportunities = self.db.getAllOpportunities()
+            opportunities = self.db.get_all_opportunities()
             recommendations, _ = rank_opportunities(
                 user_profile or {},
                 active_signups,
@@ -370,16 +378,16 @@ class VolunteerPage(QWidget):
             bookmarked_ids=self._bookmarked_ids,
         )
         card.set_bookmark_callback(self._on_bookmark_toggled)
-        card.openLinkRequested.connect(self.openLinkRequested.emit)
-        card.rsvpRequested.connect(self._handle_rsvp)
-        card.detailsRequested.connect(self._show_details)
+        card.open_link_requested.connect(self.open_link_requested.emit)
+        card.rsvp_requested.connect(self._handle_rsvp)
+        card.details_requested.connect(self._show_details)
         return card
 
-    def _on_bookmark_toggled(self, opportunityID, is_bookmarked):
+    def _on_bookmark_toggled(self, opportunity_id, is_bookmarked):
         if not self.current_volunteer_id:
             return
-        result = self.db.toggleBookmark(
-            self.current_volunteer_id, opportunityID
+        result = self.db.toggle_bookmark(
+            self.current_volunteer_id, opportunity_id
         )
         if result == "error":
             QMessageBox.warning(
@@ -387,9 +395,9 @@ class VolunteerPage(QWidget):
             )
             return
         if result == "added":
-            self._bookmarked_ids.add(opportunityID)
+            self._bookmarked_ids.add(opportunity_id)
         else:
-            self._bookmarked_ids.discard(opportunityID)
+            self._bookmarked_ids.discard(opportunity_id)
 
     def _populate_grid(self, rows):
         self._grid_cards = [
@@ -437,12 +445,12 @@ class VolunteerPage(QWidget):
         for idx, card in enumerate(self._grid_cards):
             self.grid_layout.addWidget(card, idx // cols, idx % cols)
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         if self.current_view == "grid":
             self._layout_grid()
 
-    def showEvent(self, event):
+    def showEvent(self, event):  # noqa: N802
         super().showEvent(event)
         if self.current_view == "grid":
             self._layout_grid()
@@ -477,14 +485,14 @@ class VolunteerPage(QWidget):
                 "Log in as a volunteer to RSVP.",
             )
             return
-        result = self.db.registerForOpportunity(
+        result = self.db.register_for_opportunity(
             self.current_volunteer_id, opportunity_id
         )
         if result == "ok":
             try:
-                row = self.db.getOpportunityByID(opportunity_id)
+                row = self.db.get_opportunity_by_id(opportunity_id)
                 title = row["title"] if row else "an event"
-                self.db.addNotification(
+                self.db.add_notification(
                     self.current_volunteer_id,
                     f"You signed up for {title}.",
                     "rsvp", opportunity_id,
@@ -497,7 +505,7 @@ class VolunteerPage(QWidget):
                 "You're signed up! Taking you to My Events.",
             )
             self.refresh()
-            self.rsvpSucceeded.emit(opportunity_id)
+            self.rsvp_succeeded.emit(opportunity_id)
         elif result == "duplicate":
             QMessageBox.information(
                 self, "Already registered",
@@ -512,3 +520,5 @@ class VolunteerPage(QWidget):
             QMessageBox.warning(
                 self, "Error", "Could not complete RSVP."
             )
+    openLinkRequested = property(lambda self: self.open_link_requested)  # noqa: N815
+    rsvpSucceeded = property(lambda self: self.rsvp_succeeded)  # noqa: N815

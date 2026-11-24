@@ -25,12 +25,16 @@ from datetime import date, datetime, timedelta, timezone
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QButtonGroup, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton,
+    QButtonGroup,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
     QVBoxLayout,
 )
 
 import Events.theme as theme
-
 
 # Notification type -> (card title, accent colour). Anything not listed
 # falls back to DEFAULT_NOTIF.
@@ -142,11 +146,12 @@ class VolunteerNotifications:
         self._render_notifications()
 
     def _refresh_notifications(self):
-        if not (self.db and self.userID):
+        if not (self.db and self.user_id):
             return
         self._notif_items = self._load_feed_items()
 
-        n_ann = sum(1 for i in self._notif_items if i["kind"] == "announcement")
+        n_ann = sum(
+            1 for i in self._notif_items if i["kind"] == "announcement")
         counts = {
             "all": len(self._notif_items),
             "announcement": n_ann,
@@ -162,8 +167,8 @@ class VolunteerNotifications:
         self._render_notifications()
 
     def _mark_all_notifications_read(self):
-        if self._db_action("markNotificationsRead", self.userID):
-            self.notificationsUpdated.emit()
+        if self._db_action("markNotificationsRead", self.user_id):
+            self.notifications_updated.emit()
             self._refresh_notifications()
 
     # ── Data ──────────────────────────────────────────────────────────
@@ -175,7 +180,7 @@ class VolunteerNotifications:
 
         items = []
         notifications = self._db(
-            "getNotifications", self.userID, default=[]
+            "getNotifications", self.user_id, default=[]
         ) or []
         announcement_states = {}
         for n in notifications:
@@ -190,7 +195,7 @@ class VolunteerNotifications:
         # 1) Announcements from every org the volunteer has joined or
         #    signed up with (the query lives in db.py).
         anns = self._db(
-            "getAnnouncementsForVolunteer", self.userID, default=[]
+            "getAnnouncementsForVolunteer", self.user_id, default=[]
         ) or []
         for a in anns:
             name = str(rget(a, "org_name", "") or "")
@@ -369,9 +374,9 @@ class VolunteerNotifications:
 
     def _mark_notification_read(self, item):
         if self._db_action(
-            "markNotificationRead", self.userID, item["notification_id"]
+            "markNotificationRead", self.user_id, item["notification_id"]
         ):
-            self.notificationsUpdated.emit()
+            self.notifications_updated.emit()
             self._refresh_notifications()
 
     def _add_invitation_actions(self, layout, item):
@@ -405,8 +410,8 @@ class VolunteerNotifications:
         layout.addWidget(status_label)
 
     def _respond_to_invitation(self, item, accept):
-        result = self.db.respondToOpportunityInvitation(
-            self.userID, item["invitation_id"], accept
+        result = self.db.respond_to_opportunity_invitation(
+            self.user_id, item["invitation_id"], accept
         )
         if result in ("accepted", "already_registered"):
             QMessageBox.information(
@@ -444,5 +449,5 @@ class VolunteerNotifications:
                 "Could not update the invitation. Please try again.",
             )
 
-        self.notificationsUpdated.emit()
+        self.notifications_updated.emit()
         self._refresh_notifications()

@@ -4,17 +4,20 @@ main.py - Entry point.
 Creates the QApplication, applies the initial theme, and shows Landing.
 """
 
-import sys
 import os
+import sys
 
-from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
-import Guest.focusTracker as focusTracker
+from PyQt6.QtWidgets import QApplication
+
 import Events.theme as theme
-from Guest.landing import Landing
+import Guest.focusTracker as focusTracker
 from Guest.focusTracker import FocusTracker
+from Guest.landing import Landing
 
 APP_ID = "Moxie.VolunteerManager.1"
+
+
 def _set_windows_app_id():
     """
     Tell Windows this process is 'Moxie', not 'python.exe'.

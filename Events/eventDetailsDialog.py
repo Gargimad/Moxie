@@ -10,8 +10,13 @@ identical between card and dialog.
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QWidget,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -52,7 +57,8 @@ class EventDetailsDialog(QDialog):
 
         # ── meta rows ─────────────────────────────────────────────────────
         layout.addLayout(make_meta_row("Date", card._date_text()))
-        where = "Remote" if card.is_remote else (card.location or "Location TBD")
+        where = "Remote" if card.is_remote else (
+            card.location or "Location TBD")
         layout.addLayout(make_meta_row("Where", where))
         spots = card._spots_text()
         if spots:

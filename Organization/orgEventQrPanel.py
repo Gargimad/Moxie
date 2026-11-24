@@ -2,8 +2,14 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
-    QFrame, QMessageBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -58,7 +64,7 @@ class OrgEventQrPanel(QWidget):
                 w.setParent(None)
                 w.deleteLater()
 
-        rows = self.db.getOpportunitiesByOrg(self.org["orgID"]) or []
+        rows = self.db.get_opportunities_by_org(self.org["orgID"]) or []
         rows = [r for r in rows if (r["status"] or "open") != "cancelled"]
 
         if not rows:

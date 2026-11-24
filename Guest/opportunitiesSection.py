@@ -17,7 +17,11 @@ whether the user is logged in).
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
+    QHBoxLayout,
+    QLabel,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -27,9 +31,9 @@ from Events.eventCard import EventCard
 class OpportunityRow(QWidget):
     """A titled, horizontally-scrolling strip of EventCards."""
 
-    detailsRequested = pyqtSignal(object)   # EventCard
-    openLinkRequested = pyqtSignal(str)     # url
-    rsvpRequested = pyqtSignal(int)         # opportunityID
+    details_requested = pyqtSignal(object)   # EventCard
+    open_link_requested = pyqtSignal(str)     # url
+    rsvp_requested = pyqtSignal(int)         # opportunityID
 
     def __init__(self, title, parent=None):
         super().__init__(parent)
@@ -95,18 +99,21 @@ class OpportunityRow(QWidget):
             )
             # Route every card action through this row's own signals so
             # the same behaviour is shared with the listing page.
-            card.detailsRequested.connect(self.detailsRequested.emit)
-            card.openLinkRequested.connect(self.openLinkRequested.emit)
-            card.rsvpRequested.connect(self.rsvpRequested.emit)
+            card.details_requested.connect(self.details_requested.emit)
+            card.open_link_requested.connect(self.open_link_requested.emit)
+            card.rsvp_requested.connect(self.rsvp_requested.emit)
             self.cardsLayout.addWidget(card)
 
         self.cardsLayout.addStretch(1)
+    detailsRequested = property(lambda self: self.details_requested)  # noqa: N815
+    openLinkRequested = property(lambda self: self.open_link_requested)  # noqa: N815
+    rsvpRequested = property(lambda self: self.rsvp_requested)  # noqa: N815
 
 
 class OpportunitiesSection(QWidget):
-    detailsRequested = pyqtSignal(object)
-    openLinkRequested = pyqtSignal(str)
-    rsvpRequested = pyqtSignal(int)
+    details_requested = pyqtSignal(object)
+    open_link_requested = pyqtSignal(str)
+    rsvp_requested = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -126,9 +133,9 @@ class OpportunitiesSection(QWidget):
 
         # Bubble each row's signals up so landing.py only connects once.
         for row in (self.soonestRow, self.newestRow, self.remoteRow):
-            row.detailsRequested.connect(self.detailsRequested.emit)
-            row.openLinkRequested.connect(self.openLinkRequested.emit)
-            row.rsvpRequested.connect(self.rsvpRequested.emit)
+            row.details_requested.connect(self.details_requested.emit)
+            row.open_link_requested.connect(self.open_link_requested.emit)
+            row.rsvp_requested.connect(self.rsvp_requested.emit)
 
         layout.addWidget(section_title)
         layout.addWidget(self.soonestRow)
@@ -137,9 +144,9 @@ class OpportunitiesSection(QWidget):
 
     def load_from_db(self, db, limit=10, current_volunteer_id=None):
         jobs = [
-            (self.soonestRow, db.getSoonestOpportunities),
-            (self.newestRow, db.getNewestOpportunities),
-            (self.remoteRow, db.getRemoteOpportunities),
+            (self.soonestRow, db.get_soonest_opportunities),
+            (self.newestRow, db.get_newest_opportunities),
+            (self.remoteRow, db.get_remote_opportunities),
         ]
         for row_widget, fetch in jobs:
             try:
@@ -150,3 +157,6 @@ class OpportunitiesSection(QWidget):
             row_widget.load(
                 rows, current_volunteer_id=current_volunteer_id
             )
+    detailsRequested = property(lambda self: self.details_requested)  # noqa: N815
+    openLinkRequested = property(lambda self: self.open_link_requested)  # noqa: N815
+    rsvpRequested = property(lambda self: self.rsvp_requested)  # noqa: N815

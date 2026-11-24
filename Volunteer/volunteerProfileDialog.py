@@ -15,19 +15,29 @@ A different org sees a different set of notes for the same volunteer.
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
-    QScrollArea, QWidget, QFrame, QMessageBox, QComboBox,
+    QComboBox,
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
 from Events.dateFormat import format_range, format_time_range
 
+
 class VolunteerProfileDialog(QDialog):
-    def __init__(self, db, org, userID, parent=None):
+    def __init__(self, db, org, user_id, parent=None):
         super().__init__(parent)
         self.db = db
         self.org = org
-        self.userID = userID
+        self.user_id = user_id
 
         self.setObjectName(theme.EVENT_DETAILS_DIALOG)
         self.setWindowTitle("Volunteer profile")
@@ -38,15 +48,15 @@ class VolunteerProfileDialog(QDialog):
         # Pull everything up front so the render methods stay simple.
         self.profile = self._db(
             "getVolunteerProfileForOrg",
-            org["orgID"], userID, default={},
+            org["orgID"], user_id, default={},
         ) or {}
         self.history = self._db(
             "getVolunteerHistoryForOrg",
-            org["orgID"], userID, default=[],
+            org["orgID"], user_id, default=[],
         ) or []
         self.notes = self._db(
             "getVolunteerNotes",
-            org["orgID"], userID, default=[],
+            org["orgID"], user_id, default=[],
         ) or []
 
         self._build_ui()
@@ -379,7 +389,7 @@ class VolunteerProfileDialog(QDialog):
 
         ok = self._db(
             "addVolunteerNote",
-            self.org["orgID"], self.userID, text, tag,
+            self.org["orgID"], self.user_id, text, tag,
             default=None,
         )
         if not ok:
@@ -391,15 +401,15 @@ class VolunteerProfileDialog(QDialog):
         self.tag_combo.setCurrentIndex(0)
         self.notes = self._db(
             "getVolunteerNotes",
-            self.org["orgID"], self.userID, default=[],
+            self.org["orgID"], self.user_id, default=[],
         ) or []
         self._render_notes()
 
-    def _delete_note(self, noteID):
-        self._db("deleteVolunteerNote", noteID, default=False)
+    def _delete_note(self, note_id):
+        self._db("deleteVolunteerNote", note_id, default=False)
         self.notes = self._db(
             "getVolunteerNotes",
-            self.org["orgID"], self.userID, default=[],
+            self.org["orgID"], self.user_id, default=[],
         ) or []
         self._render_notes()
 
@@ -422,7 +432,7 @@ class VolunteerProfileDialog(QDialog):
         new_state = not currently_banned
         self._db(
             "setVolunteerBanned",
-            self.org["orgID"], self.userID, new_state,
+            self.org["orgID"], self.user_id, new_state,
             default=False,
         )
         self.profile["banned"] = 1 if new_state else 0

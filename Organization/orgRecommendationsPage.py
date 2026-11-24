@@ -8,8 +8,14 @@ button. Rows are styled like a clean admin table.
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
-    QFrame, QMessageBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -18,9 +24,9 @@ from Events.dateFormat import format_event_when
 
 def _initials(first, last, email):
     f = (first or "").strip()[:1]
-    l = (last or "").strip()[:1]
-    if f or l:
-        return (f + l).upper()
+    last_initial = (last or "").strip()[:1]
+    if f or last_initial:
+        return (f + last_initial).upper()
     e = (email or "?").strip()
     return e[:1].upper()
 
@@ -74,7 +80,7 @@ class OrgRecommendationsPage(QWidget):
                 w.setParent(None)
                 w.deleteLater()
 
-        rows = self.db.getOpportunitiesByOrg(self.org["orgID"]) or []
+        rows = self.db.get_opportunities_by_org(self.org["orgID"]) or []
         rows = [r for r in rows if (r["status"] or "open") == "open"]
 
         if not rows:
@@ -115,7 +121,7 @@ class OrgRecommendationsPage(QWidget):
         col.addWidget(meta)
         head.addLayout(col, 1)
 
-        clusters = self.db.getOpportunityClusters(
+        clusters = self.db.get_opportunity_clusters(
             opp["opportunityID"]
         ) or []
         chip_row = QHBoxLayout()
@@ -137,7 +143,7 @@ class OrgRecommendationsPage(QWidget):
         v.addWidget(line)
 
         # Matches
-        matches = self.db.getRecommendedVolunteersForOpportunity(
+        matches = self.db.get_recommended_volunteers_for_opportunity(
             opp["opportunityID"], limit=8
         )
 
@@ -169,7 +175,7 @@ class OrgRecommendationsPage(QWidget):
             none.setWordWrap(True)
             v.addWidget(none)
 
-        all_volunteers = self.db.getAvailableVolunteersForOpportunity(
+        all_volunteers = self.db.get_available_volunteers_for_opportunity(
             self.org["orgID"], opp["opportunityID"]
         ) or []
         all_volunteers = [dict(volunteer) for volunteer in all_volunteers]
@@ -304,7 +310,7 @@ class OrgRecommendationsPage(QWidget):
 
         uid = volunteer["userID"]
         oid = opportunity["opportunityID"]
-        result = self.db.createOpportunityInvitation(
+        result = self.db.create_opportunity_invitation(
             self.org["orgID"], uid, oid
         )
         if result == "sent":

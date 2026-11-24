@@ -27,11 +27,21 @@ import os
 import random
 import string
 
-from PyQt6.QtCore import Qt, QDate, QByteArray
-from PyQt6.QtGui import QAction, QPixmap, QCursor
+from PyQt6.QtCore import QByteArray, QDate, Qt
+from PyQt6.QtGui import QAction, QCursor, QPixmap
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QFrame, QDateEdit, QComboBox, QScrollArea, QMessageBox, QSizePolicy,
+    QComboBox,
+    QDateEdit,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
 
 try:
@@ -42,7 +52,6 @@ except ImportError:
 
 import Events.theme as theme
 from Authentication.otp import generate_otp, send_otp_email, verify_via_otp
-
 
 COUNTRY_CHOICES = [
     "Select Country",
@@ -96,7 +105,7 @@ class VolunteerRegistration(QWidget):
 
     # ── Form construction ─────────────────────────────────────────────────
     def _build_form(self, layout):
-        
+
         back_btn = QPushButton("← Back")
         back_btn.setObjectName(theme.BACK_BTN)
         back_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -173,7 +182,8 @@ class VolunteerRegistration(QWidget):
         pass_row = QHBoxLayout()
         pass_row.setSpacing(20)
         pass_row.addLayout(labeled("Password *", self.pass_input))
-        pass_row.addLayout(labeled("Confirm Password *", self.confirmPass_input))
+        pass_row.addLayout(
+            labeled("Confirm Password *", self.confirmPass_input))
         layout.addLayout(pass_row)
 
         # ── Optional profile details ──────────────────────────────────────
@@ -204,8 +214,10 @@ class VolunteerRegistration(QWidget):
 
         location_row = QHBoxLayout()
         location_row.setSpacing(20)
-        location_row.addLayout(labeled("Country", self.country_input), stretch=2)
-        location_row.addLayout(labeled("Zip Code", self.zipcode_input), stretch=1)
+        location_row.addLayout(
+            labeled("Country", self.country_input), stretch=2)
+        location_row.addLayout(
+            labeled("Zip Code", self.zipcode_input), stretch=1)
         layout.addLayout(location_row)
 
         # ── Captcha ───────────────────────────────────────────────────────
@@ -249,7 +261,6 @@ class VolunteerRegistration(QWidget):
         submit_btn.setObjectName(theme.PRIMARY_BTN)
         submit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         submit_btn.clicked.connect(self._submit)
-
 
         layout.addWidget(submit_btn)
 
@@ -360,7 +371,7 @@ class VolunteerRegistration(QWidget):
             # User cancelled the modal — leave the form filled in.
             return
 
-        userID = self.db.register_user(
+        user_id = self.db.register_user(
             email=data["email"],
             password=data["password"],
             role="volunteer",
@@ -372,7 +383,7 @@ class VolunteerRegistration(QWidget):
             gender=data["gender"],
         )
 
-        if not userID:
+        if not user_id:
             QMessageBox.critical(
                 self, "Registration failed",
                 "Could not create the account. It may already exist."
@@ -386,7 +397,7 @@ class VolunteerRegistration(QWidget):
 
         self._reset_form()
         if self.on_success:
-            self.on_success(userID)
+            self.on_success(user_id)
 
     # ── Reset ─────────────────────────────────────────────────────────────
     def _reset_form(self):

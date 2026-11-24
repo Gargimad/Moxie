@@ -15,10 +15,9 @@ import json
 import os
 import re
 from datetime import datetime
-from urllib import request, error
+from urllib import error, request
 
 from db import Database
-
 
 VC_ENDPOINT = "https://www.volunteerconnector.org/api/search/"
 EXTERNAL_ORG_NAME = "Volunteer Connector"
@@ -67,7 +66,9 @@ def clear_cache():
 # ─────────────────────────────────────────────────────────────────────────────
 # HTTP (cache-aware)
 # ─────────────────────────────────────────────────────────────────────────────
-def fetch_page(page: int = 1, timeout: int = 10, use_cache: bool = True) -> list:
+def fetch_page(
+    page: int = 1, timeout: int = 10, use_cache: bool = True
+) -> list:
     cache = _load_cache() if use_cache else {}
     key = f"page_{page}"
 
@@ -181,10 +182,14 @@ def _date_range_to_iso(dates):
 
     Examples:
         "Ongoing"                                 -> ("", "")
-        "April 15, 2024"                          -> ("2024-04-15", "2024-04-15")
-        "April 15, 2024 - April 17, 2024"         -> ("2024-04-15", "2024-04-17")
-        "September 1, 2026 - December 15, 2026"   -> ("2026-09-01", "2026-12-15")
-        "2026-09-01 - 2026-12-15"                 -> ("2026-09-01", "2026-12-15")
+        "April 15, 2024" ->
+            ("2024-04-15", "2024-04-15")
+        "April 15, 2024 - April 17, 2024" ->
+            ("2024-04-15", "2024-04-17")
+        "September 1, 2026 - December 15, 2026" ->
+            ("2026-09-01", "2026-12-15")
+        "2026-09-01 - 2026-12-15" ->
+            ("2026-09-01", "2026-12-15")
     """
     if not isinstance(dates, str) or not dates.strip():
         return "", ""
@@ -219,29 +224,29 @@ def map_item(item: dict) -> dict:
 
     return {
         # opportunities columns
-        "source_id":       f"vc:{_as_str(item.get('id'))}",
-        "title":           _as_str(item.get("title"), "Untitled opportunity"),
-        "description":     _as_str(item.get("description")),
-        "category":        _activities_to_str(item.get("activities")) or "General",
-        "location":        _audience_to_str(item.get("audience")) or "See link",
-        "address":         "",
-        "is_remote":       1 if item.get("remote_or_online") else 0,
-        "event_date":      start_iso or raw_dates,
-        "event_end_date":  end_iso or start_iso or None,
-        "start_time":      None,
-        "end_time":        None,
-        "capacity":        None,
-        "status":          "open",
+        "source_id": f"vc:{_as_str(item.get('id'))}",
+        "title": _as_str(item.get("title"), "Untitled opportunity"),
+        "description": _as_str(item.get("description")),
+        "category": _activities_to_str(item.get("activities")) or "General",
+        "location": _audience_to_str(item.get("audience")) or "See link",
+        "address": "",
+        "is_remote": 1 if item.get("remote_or_online") else 0,
+        "event_date": start_iso or raw_dates,
+        "event_end_date": end_iso or start_iso or None,
+        "start_time": None,
+        "end_time": None,
+        "capacity": None,
+        "status": "open",
         "required_skills": _as_str(item.get("duration")) or None,
-        "contact_name":    _as_str(org.get("name")),
-        "contact_email":   None,
-        "thumbnail":       _as_str(org.get("logo")) or None,
-        "website_link":    _as_str(item.get("url")),
+        "contact_name": _as_str(org.get("name")),
+        "contact_email": None,
+        "thumbnail": _as_str(org.get("logo")) or None,
+        "website_link": _as_str(item.get("url")),
 
         # extra keys for org resolution
-        "org_name":        _as_str(org.get("name")),
-        "org_website":     org_url,
-        "org_source_id":   org_url,
+        "org_name": _as_str(org.get("name")),
+        "org_website": org_url,
+        "org_source_id": org_url,
     }
 
 
@@ -280,7 +285,8 @@ def sync(db: Database, max_pages: int = 3, use_cache: bool = True) -> int:
                      start_time, end_time, capacity,
                      status, required_skills, contact_name, contact_email,
                      thumbnail, website_link, source_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                            ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         org_id,

@@ -10,19 +10,29 @@ like VolunteerPage.filter_bar expects, plus the new keys:
 """
 import os
 
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint
+from PyQt6.QtCore import QPoint, Qt, pyqtSignal
 from PyQt6.QtGui import (
-    QCursor, QAction, QIcon, QKeySequence, QShortcut,
+    QAction,
+    QCursor,
+    QIcon,
+    QKeySequence,
+    QShortcut,
 )
 from PyQt6.QtWidgets import (
-    QApplication, QStyle,
-    QWidget, QHBoxLayout, QLineEdit, QComboBox, QPushButton,
-    QListWidget, QListWidgetItem,
+    QApplication,
+    QComboBox,
+    QHBoxLayout,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QStyle,
+    QWidget,
 )
 
 import Events.theme as theme
 from Events.careerClusters import CAREER_CLUSTERS
-from Events.gaLocations import GA_CITIES, ALL_CITIES
+from Events.gaLocations import ALL_CITIES, ga_cities
 from Events.multiSelectCauses import MultiSelectCauses
 from Guest.micAttachment import attach_mic_to_line_edit
 
@@ -30,13 +40,13 @@ MAX_RECENTS = 6
 
 
 class SearchBar(QWidget):
-    searchRequested = pyqtSignal(dict)
+    search_requested = pyqtSignal(dict)
 
     TYPE_OPTIONS = ["All", "In-person", "Remote"]
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName(theme.searchBar)
+        self.setObjectName(theme.SEARCH_BAR)
         self._recent_searches = []
 
         layout = QHBoxLayout(self)
@@ -50,7 +60,7 @@ class SearchBar(QWidget):
 
         # ── Type ──────────────────────────────────────────────────────
         self.typeCombo = QComboBox()
-        self.typeCombo.setObjectName(theme.searchCategory)
+        self.typeCombo.setObjectName(theme.SEARCH_CATEGORY)
         self.typeCombo.addItems(self.TYPE_OPTIONS)
         self.typeCombo.setFixedWidth(110)
         self.typeCombo.setCursor(
@@ -59,9 +69,9 @@ class SearchBar(QWidget):
 
         # ── City ──────────────────────────────────────────────────────
         self.cityCombo = QComboBox()
-        self.cityCombo.setObjectName(theme.searchCategory)
+        self.cityCombo.setObjectName(theme.SEARCH_CATEGORY)
         self.cityCombo.addItem(ALL_CITIES)
-        for c in GA_CITIES:
+        for c in ga_cities:
             self.cityCombo.addItem(c)
         self.cityCombo.setFixedWidth(150)
         self.cityCombo.setCursor(
@@ -70,28 +80,29 @@ class SearchBar(QWidget):
 
         # ── ZIP code ──────────────────────────────────────────────────
         self.zipcodeInput = QLineEdit()
-        self.zipcodeInput.setObjectName(theme.searchInput)
+        self.zipcodeInput.setObjectName(theme.SEARCH_INPUT)
         self.zipcodeInput.setPlaceholderText("ZIP")
         self.zipcodeInput.setMaxLength(10)
         self.zipcodeInput.setFixedWidth(90)
         self.zipcodeInput.returnPressed.connect(self._emit_search)
 
         # ── Keyword ───────────────────────────────────────────────────
-        self.searchInput = QLineEdit()
-        self.searchInput.setObjectName(theme.searchInput)
-        self.searchInput.setPlaceholderText("Search organizations, opportunities, or events...")
-        self.searchInput.setClearButtonEnabled(False)
-        self.searchInput.returnPressed.connect(self._emit_search)
-        self.searchInput.textChanged.connect(self._on_text_changed)
-        attach_mic_to_line_edit(self.searchInput)
+        self.SEARCH_INPUT = QLineEdit()
+        self.SEARCH_INPUT.setObjectName(theme.SEARCH_INPUT)
+        self.SEARCH_INPUT.setPlaceholderText(
+            "Search organizations, opportunities, or events...")
+        self.SEARCH_INPUT.setClearButtonEnabled(False)
+        self.SEARCH_INPUT.returnPressed.connect(self._emit_search)
+        self.SEARCH_INPUT.textChanged.connect(self._on_text_changed)
+        attach_mic_to_line_edit(self.SEARCH_INPUT)
 
         icon_path = theme.asset("search.svg")
         if os.path.exists(icon_path):
             icon_action = QAction(
-                QIcon(icon_path), "", self.searchInput
+                QIcon(icon_path), "", self.SEARCH_INPUT
             )
             icon_action.setEnabled(False)
-            self.searchInput.addAction(
+            self.SEARCH_INPUT.addAction(
                 icon_action, QLineEdit.ActionPosition.LeadingPosition
             )
 
@@ -99,28 +110,28 @@ class SearchBar(QWidget):
             QApplication.style().standardIcon(
                 QStyle.StandardPixmap.SP_LineEditClearButton
             ),
-            "Clear", self.searchInput,
+            "Clear", self.SEARCH_INPUT,
         )
         self.clear_action.setVisible(False)
-        self.clear_action.triggered.connect(self.searchInput.clear)
-        self.searchInput.addAction(
+        self.clear_action.triggered.connect(self.SEARCH_INPUT.clear)
+        self.SEARCH_INPUT.addAction(
             self.clear_action, QLineEdit.ActionPosition.TrailingPosition
         )
 
         # ── Search button ─────────────────────────────────────────────
-        self.searchBtn = QPushButton("Search")
-        self.searchBtn.setObjectName(theme.searchBtn)
-        self.searchBtn.setCursor(
+        self.SEARCH_BTN = QPushButton("Search")
+        self.SEARCH_BTN.setObjectName(theme.SEARCH_BTN)
+        self.SEARCH_BTN.setCursor(
             QCursor(Qt.CursorShape.PointingHandCursor)
         )
-        self.searchBtn.clicked.connect(self._emit_search)
+        self.SEARCH_BTN.clicked.connect(self._emit_search)
 
-        layout.addWidget(self.searchInput, 1)
+        layout.addWidget(self.SEARCH_INPUT, 1)
         layout.addWidget(self.causes_multi)
         layout.addWidget(self.typeCombo)
         layout.addWidget(self.cityCombo)
         layout.addWidget(self.zipcodeInput)
-        layout.addWidget(self.searchBtn)
+        layout.addWidget(self.SEARCH_BTN)
 
         # ── Recent-searches popup ─────────────────────────────────────
         self.suggestions = QListWidget()
@@ -138,12 +149,12 @@ class SearchBar(QWidget):
 
     # ── Public API ────────────────────────────────────────────────────
     def focus_input(self):
-        self.searchInput.setFocus()
-        self.searchInput.selectAll()
+        self.SEARCH_INPUT.setFocus()
+        self.SEARCH_INPUT.selectAll()
         self._maybe_show_suggestions()
 
     def set_keyword(self, text):
-        self.searchInput.setText(text)
+        self.SEARCH_INPUT.setText(text)
 
     def set_category(self, category):
         """Kept for caller compatibility — routes into causes list."""
@@ -166,17 +177,17 @@ class SearchBar(QWidget):
 
     # ── Emit ──────────────────────────────────────────────────────────
     def _emit_search(self):
-        keyword = self.searchInput.text().strip()
+        keyword = self.SEARCH_INPUT.text().strip()
         zipcode = self.zipcodeInput.text().strip()
         type_ = self.typeCombo.currentText()
         city = self.cityCombo.currentText()
         causes = self.causes_multi.checked_items()
 
         # Nothing meaningful — do nothing.
-        if (not keyword and not zipcode
-                and type_ == "All"
-                and city == ALL_CITIES
-                and not causes):
+        if (not keyword and not zipcode and
+                type_ == "All" and
+                city == ALL_CITIES and
+                not causes):
             return
 
         if keyword:
@@ -186,7 +197,7 @@ class SearchBar(QWidget):
             self._recent_searches = self._recent_searches[:MAX_RECENTS]
 
         self.suggestions.setVisible(False)
-        self.searchRequested.emit({
+        self.search_requested.emit({
             "keyword": keyword,
             "location": "",
             "zipcode": zipcode,
@@ -203,7 +214,7 @@ class SearchBar(QWidget):
     def _maybe_show_suggestions(self):
         if not self._recent_searches:
             return
-        if self.searchInput.text().strip():
+        if self.SEARCH_INPUT.text().strip():
             return
         self._populate_suggestions()
         self._position_suggestions()
@@ -216,11 +227,11 @@ class SearchBar(QWidget):
             self.suggestions.addItem(item)
 
     def _position_suggestions(self):
-        top_left = self.searchInput.mapToGlobal(
-            QPoint(0, self.searchInput.height())
+        top_left = self.SEARCH_INPUT.mapToGlobal(
+            QPoint(0, self.SEARCH_INPUT.height())
         )
         self.suggestions.move(top_left)
-        self.suggestions.setFixedWidth(self.searchInput.width())
+        self.suggestions.setFixedWidth(self.SEARCH_INPUT.width())
         count = self.suggestions.count()
         row_h = self.suggestions.sizeHintForRow(0) if count else 24
         self.suggestions.setFixedHeight(min(count * row_h + 8, 220))
@@ -229,10 +240,11 @@ class SearchBar(QWidget):
 
     def _pick_suggestion(self, item):
         text = item.data(Qt.ItemDataRole.UserRole) or item.text()
-        self.searchInput.setText(text)
+        self.SEARCH_INPUT.setText(text)
         self.suggestions.setVisible(False)
         self._emit_search()
 
-    def hideEvent(self, event):
+    def hideEvent(self, event):  # noqa: N802
         self.suggestions.setVisible(False)
         super().hideEvent(event)
+    searchRequested = property(lambda self: self.search_requested)  # noqa: N815

@@ -29,7 +29,8 @@ class VoiceWorker(QThread):
                     source, duration=0.25
                 )
                 # Listen for speech (blocks until the user stops talking)
-                audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=10)
+                audio = self.recognizer.listen(
+                    source, timeout=5, phrase_time_limit=10)
         except sr.WaitTimeoutError:
             self.failed.emit("No speech detected. Try again.")
             return

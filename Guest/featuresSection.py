@@ -4,9 +4,14 @@ featuresSection.py - The three-card "what Moxie offers" section.
 import os
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap, QCursor
+from PyQt6.QtGui import QCursor, QPixmap
 from PyQt6.QtWidgets import (
-    QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
 
 import Events.theme as theme
@@ -22,7 +27,7 @@ class _FeatureImage(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet("padding: 0; border: none;")
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         self._rescale()
 
@@ -86,17 +91,17 @@ class FeatureCard(QFrame):
         text_wrap.addStretch(1)
         layout.addLayout(text_wrap)
 
-    def mouseReleaseEvent(self, event):
-        if (event.button() == Qt.MouseButton.LeftButton
-                and self.rect().contains(event.position().toPoint())):
+    def mouseReleaseEvent(self, event):  # noqa: N802
+        if (event.button() == Qt.MouseButton.LeftButton and
+                self.rect().contains(event.position().toPoint())):
             self.clicked.emit()
         super().mouseReleaseEvent(event)
 
 
 class FeaturesSection(QWidget):
-    discoverRequested = pyqtSignal()
-    postRequested = pyqtSignal()
-    manageRequested = pyqtSignal()
+    discover_requested = pyqtSignal()
+    post_requested = pyqtSignal()
+    manage_requested = pyqtSignal()
 
     CARDS = [
         ("discoverOpportunitiesImg.jpg",
@@ -141,7 +146,10 @@ class FeaturesSection(QWidget):
 
     def _emit_for(self, idx):
         if idx == 0:
-            return self.discoverRequested.emit
+            return self.discover_requested.emit
         if idx == 1:
-            return self.postRequested.emit
-        return self.manageRequested.emit
+            return self.post_requested.emit
+        return self.manage_requested.emit
+    discoverRequested = property(lambda self: self.discover_requested)  # noqa: N815
+    manageRequested = property(lambda self: self.manage_requested)  # noqa: N815
+    postRequested = property(lambda self: self.post_requested)  # noqa: N815

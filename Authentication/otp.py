@@ -16,19 +16,23 @@ Environment (loaded from .env via python-dotenv, once at import):
 """
 
 import os
+import secrets
 import smtplib
 import ssl
-import secrets
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from dotenv import load_dotenv
-
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
     QMessageBox,
+    QPushButton,
+    QVBoxLayout,
 )
 
 import Events.theme as theme

@@ -19,26 +19,48 @@ same list - NAV_TO_STACK bridges them.
 import sqlite3
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTextEdit, QPushButton, QComboBox, QDateEdit, QCheckBox, QSpinBox,
-    QListWidget, QListWidgetItem, QMessageBox, QFrame, QScrollArea,
-    QGridLayout, QStackedWidget, QFileDialog, QDialog,
-)
-from Events.dateFormat import format_date, format_range, format_event_when
-from Events.careerClusters import (
-    CAREER_CLUSTERS, legacy_category_to_cluster,
-)
-from Events.gaLocations import GA_CITIES
-import Events.theme as theme
-from Events.eventCard import clear_thumbnail_cache
-from Events.moxieCharts import (
-    KpiTile, HBarChart, VBarChart, AreaChart, DonutChart,
-    section_label,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
+    QDialog,
+    QFileDialog,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QStackedWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
 
+import Events.theme as theme
+from Events.careerClusters import (
+    CAREER_CLUSTERS,
+    legacy_category_to_cluster,
+)
+from Events.dateFormat import format_date, format_event_when, format_range
+from Events.eventCard import clear_thumbnail_cache
+from Events.gaLocations import ga_cities
+from Events.moxieCharts import (
+    AreaChart,
+    DonutChart,
+    HBarChart,
+    KpiTile,
+    VBarChart,
+    section_label,
+)
 
 TAB_OVERVIEW, TAB_LIST, TAB_FORM, TAB_ANNOUNCEMENTS = 0, 1, 2, 3
 TAB_VOLUNTEERS, TAB_REPORTS = 4, 5
@@ -90,12 +112,12 @@ class OrgDashboard(QWidget):
         self.stack.addWidget(self._build_form_page())           # 2
         self.stack.addWidget(self._build_announcements_page())  # 3
 
-        from Organization.orgVolunteersPage import OrgVolunteersPage
-        from Organization.orgReportsPage import OrgReportsPage
         from Organization.orgMigrationPage import OrgMigrationPage
         from Organization.orgRecommendationsPage import (
             OrgRecommendationsPage,
         )
+        from Organization.orgReportsPage import OrgReportsPage
+        from Organization.orgVolunteersPage import OrgVolunteersPage
         self.volunteersPage = OrgVolunteersPage(self.db)
         self.reportsPage = OrgReportsPage(self.db)
         self.migrationPage = OrgMigrationPage(self.db)
@@ -332,6 +354,7 @@ class OrgDashboard(QWidget):
         lbl.setObjectName(theme.EVENT_META_VALUE)
         lbl.setWordWrap(True)
         return lbl
+
     def _dash_card(self, title, link_text=None, tab=None):
         card = QFrame()
         card.setObjectName(theme.EVENT_CARD)
@@ -398,8 +421,8 @@ class OrgDashboard(QWidget):
 
         self.org_title.setText(self.org.get("org_name", "Organization"))
         self.org_subtitle.setText(
-            self.org.get("description", "")
-            or "Manage your opportunities"
+            self.org.get("description", "") or
+            "Manage your opportunities"
         )
 
         for lay in (self.overview_attention, self.overview_next,
@@ -432,10 +455,10 @@ class OrgDashboard(QWidget):
         monthly = {}
         try:
             all_signups = []
-            ops = self.db.getOpportunitiesByOrg(self.org["orgID"]) or []
+            ops = self.db.get_opportunities_by_org(self.org["orgID"]) or []
             for op in ops:
-                for s in (self.db.getSignupsForOpportunity(
-                    op["opportunityID"]) or []):
+                for s in (self.db.get_signups_for_opportunity(
+                        op["opportunityID"]) or []):
                     all_signups.append(s)
         except Exception:
             all_signups = []
@@ -456,7 +479,7 @@ class OrgDashboard(QWidget):
 
         # Status donut
         try:
-            rows = self.db.getOpportunitiesByOrg(self.org["orgID"]) or []
+            rows = self.db.get_opportunities_by_org(self.org["orgID"]) or []
         except Exception:
             rows = []
         status_counts = {}
@@ -558,6 +581,7 @@ class OrgDashboard(QWidget):
             rows = [("No hours logged yet", 0.0)]
         self._chart_leaderboard.set_data(rows)
     # ── 1. List ────────────────────────────────────────────────────
+
     def _build_list_page(self):
         page = QWidget()
         lay = QVBoxLayout(page)
@@ -605,7 +629,7 @@ class OrgDashboard(QWidget):
         if not self.org:
             return
         try:
-            rows = self.db.getOpportunitiesByOrg(self.org["orgID"])
+            rows = self.db.get_opportunities_by_org(self.org["orgID"])
         except Exception as e:
             print("Org opportunities query failed:", e)
             return
@@ -700,7 +724,7 @@ class OrgDashboard(QWidget):
         self.f_city.setEditable(True)
         self.f_city.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.f_city.addItem("")
-        self.f_city.addItems(GA_CITIES)
+        self.f_city.addItems(ga_cities)
         self.f_city.lineEdit().setPlaceholderText("Georgia city")
 
         self.f_location = QLineEdit()
@@ -1049,7 +1073,7 @@ class OrgDashboard(QWidget):
         oid = item.data(Qt.ItemDataRole.UserRole)
         if not oid:
             return
-        row = self.db.getOpportunityByID(oid)
+        row = self.db.get_opportunity_by_id(oid)
         if not row:
             QMessageBox.warning(self, "Not found",
                                 "That opportunity no longer exists.")
@@ -1149,20 +1173,20 @@ class OrgDashboard(QWidget):
             return
 
         try:
-            signups = self.db.getSignupsForOpportunity(oid)
+            signups = self.db.get_signups_for_opportunity(oid)
         except Exception as e:
             print("getSignupsForOpportunity failed:", e)
             signups = []
-        row = self.db.getOpportunityByID(oid)
+        row = self.db.get_opportunity_by_id(oid)
         title = row["title"] if row else "an event"
 
-        self.db.updateOpportunity(oid, status="cancelled")
+        self.db.update_opportunity(oid, status="cancelled")
 
         for s in signups:
             if (s["status"] or "") != "registered":
                 continue
             try:
-                self.db.addNotification(
+                self.db.add_notification(
                     s["userID"],
                     f"{title} has been cancelled by the organization.",
                     "opportunity_cancelled",
@@ -1184,7 +1208,7 @@ class OrgDashboard(QWidget):
         oid = item.data(Qt.ItemDataRole.UserRole)
         if not oid:
             return
-        row = self.db.getOpportunityByID(oid)
+        row = self.db.get_opportunity_by_id(oid)
         if not row:
             QMessageBox.warning(self, "Not found",
                                 "That opportunity no longer exists.")
@@ -1205,7 +1229,7 @@ class OrgDashboard(QWidget):
         opportunity_id = item.data(Qt.ItemDataRole.UserRole)
         if not opportunity_id:
             return
-        row = self.db.getOpportunityByID(opportunity_id)
+        row = self.db.get_opportunity_by_id(opportunity_id)
         if not row:
             return
         details = [
@@ -1230,7 +1254,7 @@ class OrgDashboard(QWidget):
         if not path:
             return
         try:
-            self.db.backupTo(path)
+            self.db.backup_to(path)
         except (OSError, sqlite3.Error, ValueError) as exc:
             QMessageBox.warning(
                 self, "Backup failed",
@@ -1263,8 +1287,8 @@ class OrgDashboard(QWidget):
             f"{datetime.now():%Y%m%d-%H%M%S}.db"
         )
         try:
-            self.db.backupTo(safety_path)
-            self.db.restoreFrom(path)
+            self.db.backup_to(safety_path)
+            self.db.restore_from(path)
         except (OSError, sqlite3.Error, ValueError) as exc:
             QMessageBox.warning(
                 self, "Restore failed",
@@ -1362,20 +1386,20 @@ class OrgDashboard(QWidget):
             thumbnail=self._pending_thumbnail,
         )
         category_cluster = (
-            legacy_category_to_cluster(category)
-            or (category if category in CAREER_CLUSTERS else None)
+            legacy_category_to_cluster(category) or
+            (category if category in CAREER_CLUSTERS else None)
         )
 
         if self.editing_id:
-            ok = self.db.updateOpportunity(self.editing_id, **payload)
+            ok = self.db.update_opportunity(self.editing_id, **payload)
             if not ok:
                 QMessageBox.warning(self, "Save failed",
                                     "Could not update opportunity.")
                 return
             opportunity_id = self.editing_id
         else:
-            new_id = self.db.addOpportunity(
-                orgID=self.org["orgID"],
+            new_id = self.db.add_opportunity(
+                org_id=self.org["orgID"],
                 **payload,
             )
             if not new_id:
@@ -1385,18 +1409,18 @@ class OrgDashboard(QWidget):
             opportunity_id = new_id
             # Notify matching volunteers (best-effort).
             try:
-                n = self.db.notifyVolunteersAboutOpportunity(new_id)
+                n = self.db.notify_volunteers_about_opportunity(new_id)
                 print(f"[org] notified {n} matching volunteers")
             except Exception as e:
                 print("notifyVolunteersAboutOpportunity failed:", e)
 
         category_changed = (
-            self.editing_id is None
-            or category != self._original_category
+            self.editing_id is None or
+            category != self._original_category
         )
         if (
-            category_cluster and category_changed
-            and not self.db.setOpportunityClusters(
+            category_cluster and category_changed and
+            not self.db.set_opportunity_clusters(
                 opportunity_id, [category_cluster]
             )
         ):
@@ -1534,7 +1558,7 @@ class OrgDashboard(QWidget):
             pin_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
             pin_btn.clicked.connect(
                 lambda _, aid=r["announcementID"],
-                       p=not r["pinned"]: self._toggle_pin(aid, p)
+                p=not r["pinned"]: self._toggle_pin(aid, p)
             )
             row.addWidget(pin_btn)
 
@@ -1585,17 +1609,17 @@ class OrgDashboard(QWidget):
         )
         self._refresh_announcements()
 
-    def _toggle_pin(self, announcementID, pin):
-        self._db_call("setAnnouncementPinned", announcementID, pin)
+    def _toggle_pin(self, announcement_id, pin):
+        self._db_call("setAnnouncementPinned", announcement_id, pin)
         self._refresh_announcements()
 
-    def _delete_announcement(self, announcementID):
+    def _delete_announcement(self, announcement_id):
         if QMessageBox.question(
             self, "Delete announcement",
             "Delete this announcement? This cannot be undone."
         ) != QMessageBox.StandardButton.Yes:
             return
-        self._db_call("deleteAnnouncement", announcementID)
+        self._db_call("deleteAnnouncement", announcement_id)
         self._refresh_announcements()
 
     # ── DB wrapper ─────────────────────────────────────────────────
